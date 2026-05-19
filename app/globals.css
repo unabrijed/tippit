@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #F7F4EF;
+  --foreground: #1A1917;
+  --card: #EDE9E2;
+  --card-foreground: #1A1917;
+  --border: rgba(143, 168, 159, 0.5);
+  --input: #EDE9E2;
+  --muted: #EFE9E1;
+  --muted-foreground: #6B6560;
+  --primary: #2C4A3E;
+  --primary-foreground: #F7F4EF;
+  --secondary: transparent;
+  --secondary-foreground: #2C4A3E;
+  --accent: #4A7C6B;
+  --accent-foreground: #F7F4EF;
+  --destructive: #8C3A2F;
+  --destructive-foreground: #F7F4EF;
+  --ring: #2C4A3E;
+  --success: #3A6B4A;
+  --success-foreground: #F7F4EF;
+}
+
+.dark {
+  --background: #171614;
+  --foreground: #F7F4EF;
+  --card: #23211E;
+  --card-foreground: #F7F4EF;
+  --border: rgba(143, 168, 159, 0.3);
+  --input: #23211E;
+  --muted: #211F1C;
+  --muted-foreground: #C9C1B8;
+  --primary: #F7F4EF;
+  --primary-foreground: #171614;
+  --secondary: transparent;
+  --secondary-foreground: #F7F4EF;
+  --accent: #8FA89F;
+  --accent-foreground: #171614;
+  --destructive: #C76A5A;
+  --destructive-foreground: #171614;
+  --ring: #C9A96E;
+  --success: #8FA89F;
+  --success-foreground: #171614;
+}
+
+* {
+  @apply border-border;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  font-family: var(--font-sans), sans-serif;
+  background-image:
+    radial-gradient(circle at top, rgba(201, 169, 110, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(247, 244, 239, 0.9), rgba(247, 244, 239, 1));
+}
+
+.dark body {
+  background-image:
+    radial-gradient(circle at top, rgba(201, 169, 110, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(23, 22, 20, 0.95), rgba(23, 22, 20, 1));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-enter {
+    opacity: 0;
+    animation: enter 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: forwards;
+  }
+
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.mono-address {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}

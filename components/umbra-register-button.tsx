@@ -1,0 +1,49 @@
+"use client";
+
+import { useState } from "react";
+import { ShieldCheck } from "@phosphor-icons/react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { Button } from "@/components/ui/button";
+import { registerUmbraUser } from "@/lib/umbra/browser";
+import { useNetwork } from "@/components/network-provider";
+import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
+
+export function UmbraRegisterButton() {
+  const { wallet, connected } = useWallet();
+  const { setVisible } = useWalletModal();
+  const [state, setState] = useState<{ loading: boolean; message?: string; error?: string }>({ loading: false });
+  const support = getUmbraWalletSupport(wallet);
+  const { network } = useNetwork();
+
+  const register = async () => {
+    if (!connected) {
+      setVisible(true);
+      return;
+    }
+
+    if (!support.supported) {
+      setState({ loading: false, error: support.reason });
+      return;
+    }
+
+    try {
+      setState({ loading: true });
+      const signatures = await registerUmbraUser(wallet, network);
+      setState({ loading: false, message: signatures.length > 0 ? `Registered with ${signatures.length} Umbra transaction${signatures.length > 1 ? "s" : ""}.` : "Umbra registration already up to date." });
+    } catch (error) {
+      setState({ loading: false, error: error instanceof Error ? error.message : "Could not register with Umbra." });
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Button onClick={register} disabled={state.loading || (connected && !support.supported)} variant="secondary">
+        <ShieldCheck aria-hidden className="h-4 w-4" />
+        {state.loading ? "Registering…" : !connected ? "Connect wallet for Umbra" : support.supported ? "Register wallet with Umbra" : "Switch wallet for Umbra"}
+      </Button>
+      {state.message ? <p className="text-xs text-ghost-smoke dark:text-[#C9C1B8]">{state.message}</p> : null}
+      {state.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
+    </div>
+  );
+}
