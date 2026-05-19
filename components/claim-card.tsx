@@ -79,7 +79,7 @@ export function ClaimCard({ intent }: { intent: PaymentIntentRecord }) {
         {state.receiptCode ? <div className="flex items-start gap-2 rounded-md border border-ghost-gold/40 bg-[linear-gradient(90deg,rgba(201,169,110,0.12),rgba(212,196,168,0.22),rgba(201,169,110,0.12))] px-4 py-3 text-sm text-ghost-smoke animate-shimmer"><CheckCircle className="mt-0.5 h-4 w-4 text-ghost-pine" aria-hidden /><span>Claim complete. Redirecting to receipt {state.receiptCode}.</span></div> : null}
         {requiresUmbraWallet && connected && !support.supported ? (
           <div className="rounded-md border border-ghost-pine/20 bg-ghost-pine/5 px-4 py-3 text-sm text-ghost-smoke dark:text-[#D4CEC6]">
-            This private claim uses Umbra. Switch to Phantom or Solflare to finish claiming it.
+            This private claim uses Umbra. Use a compatible Wallet Standard wallet to finish claiming it.
           </div>
         ) : null}
 
@@ -92,7 +92,7 @@ export function ClaimCard({ intent }: { intent: PaymentIntentRecord }) {
               : !connected
                 ? "Connect wallet to claim"
                 : requiresUmbraWallet && !support.supported
-                  ? "Switch wallet for Umbra"
+                  ? "Use a compatible wallet"
                   : requiresUmbraWallet
                     ? "Claim privately with Umbra"
                     : "Finalize claim"}

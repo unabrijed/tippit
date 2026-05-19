@@ -28,7 +28,7 @@ export function UmbraReadinessCard() {
         </div>
         <div className="rounded-md border border-border bg-background px-4 py-3 text-sm text-ghost-smoke dark:text-[#C9C1B8]">
           {!connected
-            ? "Connect Phantom or Solflare to register for Umbra and use private payments."
+            ? "Connect a compatible wallet to register for Umbra and use private payments."
             : support.supported
               ? `Umbra is ready with ${support.walletName ?? "your wallet"}.`
               : support.reason}

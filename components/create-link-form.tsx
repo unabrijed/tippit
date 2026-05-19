@@ -27,6 +27,7 @@ export function CreateLinkForm() {
     amount: String(defaultUsdc.defaultAmount),
     tokenType: "USDC" as SupportedToken,
     tokenMint: defaultUsdc.mint ?? "",
+    privacyMode: "umbra_utxo" as "umbra_utxo" | "public_transfer",
     linkType: "one_time",
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
     displayName: ""
@@ -49,7 +50,8 @@ export function CreateLinkForm() {
       ...current,
       tokenType,
       amount: String(token.defaultAmount),
-      tokenMint: token.mint ?? ""
+      tokenMint: token.mint ?? "",
+      privacyMode: tokenType === "USDC" ? "umbra_utxo" : "public_transfer"
     }));
   };
 
@@ -87,6 +89,7 @@ export function CreateLinkForm() {
             amount: form.amount,
             tokenType: form.tokenType,
             tokenMint: form.tokenType === "USDC" ? form.tokenMint : undefined,
+            privacyMode: form.privacyMode,
             linkType: form.linkType,
             expiresAt: new Date(form.expiresAt).toISOString(),
             displayName: form.displayName || undefined,
@@ -160,6 +163,12 @@ export function CreateLinkForm() {
             <Field label="USDC mint" htmlFor="tokenMint" helper={form.tokenType === "USDC" ? `${config.label} USDC by default. Override if your mint differs.` : "Not needed for native SOL payments."}>
               <Input id="tokenMint" value={form.tokenMint} onChange={(e) => update("tokenMint", e.target.value)} spellCheck={false} className="mono-address" disabled={form.tokenType === "SOL"} />
             </Field>
+          </div>
+
+          <div className="rounded-md border border-ghost-pine/20 bg-ghost-pine/5 px-4 py-3 text-sm text-ghost-smoke dark:text-[#D4CEC6]">
+            {form.tokenType === "USDC"
+              ? "USDC links are Umbra-private by default and do not allow a public transfer fallback."
+              : "SOL links use the public transfer path. Umbra private payments are currently enabled for USDC links."}
           </div>
 
           <Field label="Description" htmlFor="description" helper="Optional public context for the payer.">

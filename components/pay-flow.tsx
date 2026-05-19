@@ -41,6 +41,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const canPay = useMemo(() => link.status === "active" && !link.isExpired && networkMatches, [link.isExpired, link.status, networkMatches]);
   const umbraSupport = useMemo(() => getUmbraWalletSupport(wallet), [wallet]);
   const canPayPrivately = canPay && link.tokenType === "USDC" && connected && umbraSupport.supported;
+  const prefersPrivatePayments = link.tokenType === "USDC" && link.privacyMode === "umbra_utxo";
 
   const ensureSufficientBalance = async () => {
     if (!publicKey) throw new Error("Connect a wallet before paying.");
@@ -81,12 +82,12 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const payPrivately = async () => {
     if (!connected) {
       setVisible(true);
-      setState({ loading: false, error: "Connect Phantom or Solflare to pay privately with Umbra." });
+      setState({ loading: false, error: "Connect a compatible Wallet Standard wallet to pay privately with Umbra." });
       return;
     }
 
     if (!umbraSupport.supported) {
-      setState({ loading: false, error: umbraSupport.reason ?? "Switch to Phantom or Solflare to use Umbra private payments." });
+      setState({ loading: false, error: umbraSupport.reason ?? "Use a compatible wallet to pay privately with Umbra." });
       return;
     }
 
@@ -223,13 +224,16 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
                 <ShieldCheck aria-hidden className="mt-0.5 h-5 w-5" />
                 <div className="space-y-1">
                   <p className="font-medium">Private via Umbra</p>
-                  <p className="text-ghost-smoke dark:text-[#D4CEC6]">SPL fallback + Umbra beta path with private UTXOs.</p>
+                  <p className="text-ghost-smoke dark:text-[#D4CEC6]">
+                    {prefersPrivatePayments ? "This link is configured to prefer Umbra private payments." : "Umbra private payments are available for compatible USDC wallets."}
+                  </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em]">
                 <StatusPill status={link.status === "active" ? "active" : link.status}>{link.status}</StatusPill>
                 <span className="rounded-md border border-border px-3 py-2">{link.tokenSymbol}</span>
                 {link.receiverWallet ? <span className="rounded-md border border-border px-3 py-2">Wallet hidden</span> : null}
+                {prefersPrivatePayments ? <span className="rounded-md border border-border px-3 py-2">Umbra preferred</span> : null}
                 <span className="rounded-md border border-border px-3 py-2">{link.network}</span>
               </div>
             </div>
@@ -246,12 +250,12 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
             {connected && publicKey ? <div className="rounded-md border border-border bg-background px-4 py-3 text-sm text-ghost-smoke">Paying from <span className="mono-address">{truncateAddress(publicKey.toBase58())}</span></div> : null}
             {!connected ? (
               <div className="rounded-md border border-border bg-background px-4 py-3 text-sm text-ghost-smoke">
-                Connect a wallet to continue. Use Phantom or Solflare if you want the Umbra private-pay path for USDC.
+                Connect a wallet to continue. Use a compatible Wallet Standard wallet if you want the Umbra private-pay path for USDC.
               </div>
             ) : null}
             {connected && link.tokenType === "USDC" && !umbraSupport.supported ? (
               <div className="rounded-md border border-ghost-pine/20 bg-ghost-pine/5 px-4 py-3 text-sm text-ghost-smoke dark:text-[#D4CEC6]">
-                Private pay uses Umbra through your connected wallet. Switch to Phantom or Solflare to enable it. Public pay is still available.
+                Private pay uses Umbra through your connected wallet. Use a compatible Wallet Standard wallet to enable it. Public pay is still available.
               </div>
             ) : null}
             {connected && link.tokenType === "USDC" && umbraSupport.supported ? (
@@ -270,25 +274,39 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
                 This link accepts native SOL. Private Umbra pay is currently shown only for USDC links.
               </div>
             ) : null}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button onClick={connected ? pay : () => setVisible(true)} disabled={!canPay || state.loading} aria-busy={state.loading}>
-                {state.loading && state.mode === "public" ? state.step ?? "Processing…" : !connected ? "Connect wallet" : `Pay ${formatAmount(link.amount, link.tokenSymbol)}`}
-              </Button>
-              <Button onClick={!connected ? () => setVisible(true) : payPrivately} disabled={!canPay || state.loading || (connected && !canPayPrivately)} aria-busy={state.loading} variant="secondary">
-                {state.loading && state.mode === "private"
-                  ? state.step ?? "Processing…"
-                  : !connected
-                    ? "Connect Phantom or Solflare"
-                    : link.tokenType !== "USDC"
-                      ? "Private pay for USDC only"
+            <div className={`grid gap-3 ${prefersPrivatePayments ? "" : "sm:grid-cols-2"}`}>
+              {prefersPrivatePayments ? (
+                <Button onClick={!connected ? () => setVisible(true) : payPrivately} disabled={!canPay || state.loading || (connected && !canPayPrivately)} aria-busy={state.loading}>
+                  {state.loading
+                    ? state.step ?? "Processing…"
+                    : !connected
+                      ? "Connect compatible wallet"
                       : canPayPrivately
                         ? "Pay privately with Umbra"
-                        : "Switch wallet for Umbra"}
-              </Button>
+                        : "Use a compatible wallet"}
+                </Button>
+              ) : (
+                <>
+                  <Button onClick={connected ? pay : () => setVisible(true)} disabled={!canPay || state.loading} aria-busy={state.loading}>
+                    {state.loading && state.mode === "public" ? state.step ?? "Processing…" : !connected ? "Connect wallet" : `Pay ${formatAmount(link.amount, link.tokenSymbol)}`}
+                  </Button>
+                  <Button onClick={!connected ? () => setVisible(true) : payPrivately} disabled={!canPay || state.loading || (connected && !canPayPrivately)} aria-busy={state.loading} variant="secondary">
+                    {state.loading && state.mode === "private"
+                      ? state.step ?? "Processing…"
+                      : !connected
+                        ? "Connect compatible wallet"
+                        : link.tokenType !== "USDC"
+                          ? "Private pay for USDC only"
+                          : canPayPrivately
+                            ? "Pay privately with Umbra"
+                            : "Use a compatible wallet"}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
-          <SolanaPayQr slug={link.slug} />
+          {!prefersPrivatePayments ? <SolanaPayQr slug={link.slug} /> : null}
         </div>
       </CardContent>
     </Card>

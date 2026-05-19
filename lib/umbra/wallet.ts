@@ -1,7 +1,5 @@
 import type { Wallet } from "@solana/wallet-adapter-react";
 
-export const UMBRA_SUPPORTED_WALLET_NAMES = ["Phantom", "Solflare"] as const;
-
 export type UmbraWalletSupport = {
   supported: boolean;
   walletName?: string;
@@ -15,7 +13,7 @@ function hasFeatureSet(features: Record<string, unknown> | undefined, candidates
 
 export function getUmbraWalletSupport(wallet: Wallet | null): UmbraWalletSupport {
   if (!wallet) {
-    return { supported: false, reason: "Connect Phantom or Solflare to use Umbra private payments." };
+    return { supported: false, reason: "Connect a compatible Wallet Standard wallet to use Umbra private payments." };
   }
 
   const adapter = wallet.adapter as any;
@@ -32,7 +30,7 @@ export function getUmbraWalletSupport(wallet: Wallet | null): UmbraWalletSupport
     return {
       supported: false,
       walletName,
-      reason: `${walletName ?? "This wallet"} does not expose the signing features Umbra needs. Switch to Phantom or Solflare in browser mode.`
+      reason: `${walletName ?? "This wallet"} does not expose the signing features Umbra needs. Use a Wallet Standard wallet with message signing and transaction signing enabled.`
     };
   }
 

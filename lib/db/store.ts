@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { DEFAULT_USDC_SYMBOL, getDefaultUsdcMint } from "@/lib/solana/tokens";
 import type { SupportedToken } from "@/lib/solana/tokens";
 import { slugify } from "@/lib/format";
 import { appEnv } from "@/lib/env";
@@ -62,122 +61,6 @@ const keys = {
   paymentEvents: "ghostpay:payment-events"
 } as const;
 
-function seedMemory() {
-  if (merchants.size > 0) return;
-
-  const network: AppNetwork = "mainnet";
-  const merchantId = randomUUID();
-  const merchant: MerchantRecord = {
-    id: merchantId,
-    walletAddress: "8x4sPGwX8fYJ89XxVY4jLqZx8sKq9r5Wp7cGpf8F3c2y",
-    displayName: "Shoonya Studio",
-    network,
-    createdAt: now()
-  };
-  merchants.set(merchant.id, merchant);
-
-  const linkId = randomUUID();
-  paymentLinks.set(linkId, {
-    id: linkId,
-    merchantId,
-    receiverWallet: merchant.walletAddress,
-    displayName: merchant.displayName,
-    slug: "demo-shoonya-design-assignment",
-    title: "Shoonya Design Assignment",
-    description: "Private design sprint payout for the final handoff.",
-    amount: 50,
-    tokenType: "USDC",
-    tokenMint: getDefaultUsdcMint(network),
-    tokenSymbol: DEFAULT_USDC_SYMBOL,
-    network,
-    linkType: "one_time",
-    privacyMode: "public_transfer",
-    status: "active",
-    expiresAt: addHours(24),
-    createdAt: now(),
-    updatedAt: now()
-  });
-
-  const designAssignmentId = randomUUID();
-  paymentLinks.set(designAssignmentId, {
-    id: designAssignmentId,
-    merchantId,
-    receiverWallet: merchant.walletAddress,
-    displayName: merchant.displayName,
-    slug: "design-assignment-6cae81",
-    title: "Design Assignment",
-    description: "Private design assignment payout.",
-    amount: 50,
-    tokenType: "USDC",
-    tokenMint: getDefaultUsdcMint(network),
-    tokenSymbol: DEFAULT_USDC_SYMBOL,
-    network,
-    linkType: "one_time",
-    privacyMode: "public_transfer",
-    status: "active",
-    expiresAt: addHours(24),
-    createdAt: now(),
-    updatedAt: now()
-  });
-
-  const demoReceipt: ReceiptRecord = {
-    id: randomUUID(),
-    paymentIntentId: "demo-payment-intent",
-    receiptCode: "demo-gp-82kx",
-    status: "issued",
-    intentStatus: "claimed",
-    amount: 50,
-    tokenSymbol: DEFAULT_USDC_SYMBOL,
-    network,
-    displayName: merchant.displayName,
-    createdAt: now()
-  };
-  receipts.set(demoReceipt.receiptCode, demoReceipt);
-}
-
-seedMemory();
-
-function ensureSeedLinksPresent() {
-  if (merchants.size === 0) {
-    seedMemory();
-    return true;
-  }
-
-  const existingDesignAssignment = [...paymentLinks.values()].some((link) => link.slug === "design-assignment-6cae81" && link.network === "mainnet");
-  if (existingDesignAssignment) {
-    return false;
-  }
-
-  const merchant = [...merchants.values()].find((item) => item.network === "mainnet");
-  if (!merchant) {
-    seedMemory();
-    return true;
-  }
-
-  const id = randomUUID();
-  paymentLinks.set(id, {
-    id,
-    merchantId: merchant.id,
-    receiverWallet: merchant.walletAddress,
-    displayName: merchant.displayName,
-    slug: "design-assignment-6cae81",
-    title: "Design Assignment",
-    description: "Private design assignment payout.",
-    amount: 50,
-    tokenType: "USDC",
-    tokenMint: getDefaultUsdcMint(merchant.network),
-    tokenSymbol: DEFAULT_USDC_SYMBOL,
-    network: merchant.network,
-    linkType: "one_time",
-    privacyMode: "public_transfer",
-    status: "active",
-    expiresAt: addHours(24),
-    createdAt: now(),
-    updatedAt: now()
-  });
-  return true;
-}
-
 function normalizeMerchantRecord(merchant: MerchantRecord | (Omit<MerchantRecord, "network"> & { network?: AppNetwork })) : MerchantRecord {
   return { ...merchant, network: merchant.network ?? DEFAULT_APP_NETWORK };
 }
@@ -229,16 +112,12 @@ async function ensureMemoryLoaded() {
   try {
     const raw = await readFile(localStorePath, "utf8");
     hydrateMemory(JSON.parse(raw) as LocalStoreSnapshot);
-    if (ensureSeedLinksPresent()) {
-      await persistMemory();
-    }
   } catch {
     merchants.clear();
     paymentLinks.clear();
     paymentIntents.clear();
     receipts.clear();
     paymentEvents.splice(0, paymentEvents.length);
-    seedMemory();
     await persistMemory();
   }
 
@@ -335,7 +214,7 @@ export async function createPaymentLink(input: PaymentLinkInsert) {
       tokenSymbol: input.tokenType,
       network: input.network,
       linkType: input.linkType,
-      privacyMode: input.privacyMode ?? "public_transfer",
+      privacyMode: input.privacyMode ?? (input.tokenType === "USDC" ? "umbra_utxo" : "public_transfer"),
       status: "active",
       expiresAt: input.expiresAt,
       createdAt: now(),
@@ -362,7 +241,7 @@ export async function createPaymentLink(input: PaymentLinkInsert) {
     tokenSymbol: input.tokenType,
     network: input.network,
     linkType: input.linkType,
-    privacyMode: input.privacyMode ?? "public_transfer",
+    privacyMode: input.privacyMode ?? (input.tokenType === "USDC" ? "umbra_utxo" : "public_transfer"),
     status: "active",
     expiresAt: input.expiresAt,
     createdAt: now(),
