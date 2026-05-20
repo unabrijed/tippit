@@ -4,6 +4,7 @@ import { createMagicBlockTipTx } from "@/lib/magicblock/tips";
 import { resolveMagicBlockRpc } from "@/lib/magicblock/tx";
 import { buildTipTransferSchema } from "@/lib/tippit/validators";
 import { getCreatorBySlug, getTipByClientRefId, markTipSigned } from "@/lib/tippit/store";
+import { getCreatorSession } from "@/lib/tippit/cookies";
 
 export async function POST(request: Request) {
   const payload = await request.json();
@@ -23,13 +24,18 @@ export async function POST(request: Request) {
   }
 
   const network = getNetworkFromRequest(request);
+
+  // Read the creator's MagicBlock session token from cookies (set during /api/magicblock/login)
+  const session = getCreatorSession();
+
   const tx = await createMagicBlockTipTx({
     fanWallet: parsed.data.fanWallet,
     creatorWallet: creator.walletAddress,
     amountBaseUnits: tip.amount,
     mint: tip.tokenMint,
     clientRefId: tip.clientRefId,
-    network
+    network,
+    token: session.token
   });
 
   await markTipSigned(tip.clientRefId);

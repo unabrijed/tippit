@@ -66,18 +66,8 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
   try {
     onProgress?.("Preparing Umbra wallet registration…");
     const { sdk, client } = await getClient(wallet, network);
-    const { prover } = await getUmbraDeps();
-    const register = sdk.getUserRegistrationFunction(
-      { client },
-      {
-        zkProver: prover.getUserRegistrationProver({
-          callbacks: {
-            onStart: () => onProgress?.("Generating Umbra registration proof…"),
-            onComplete: () => onProgress?.("Submitting Umbra registration…")
-          } as any
-        })
-      }
-    );
+    // SDK v4+: registration no longer requires a zkProver — pass no deps
+    const register = sdk.getUserRegistrationFunction({ client });
     const result = await register({ confidential: true, anonymous: true });
     onProgress?.("Umbra registration ready.");
     return result;
@@ -147,13 +137,20 @@ export async function claimLatestPrivatePayment(wallet: Wallet | null, args: { r
 
     const scan = sdk.getClaimableUtxoScannerFunction({ client });
     const scanned = await scan(0 as any, 0 as any, 256 as any);
-    const candidates = [...scanned.publicReceived, ...scanned.received];
+    // SDK uses publicReceiver / receiver (not publicReceived / received)
+    const candidates = [...(scanned.publicReceiver ?? []), ...(scanned.receiver ?? [])];
     const target = pickBestClaimCandidate(candidates, args.receiverAddress, args.amount);
     if (!target) {
       throw new Error("No matching private tip was found to claim yet.");
     }
 
-    const fetchBatchMerkleProof = sdk.getBatchMerkleProofFetcher({ apiEndpoint: appEnv.umbraIndexerApiEndpoint } as any);
+    // SDK v4+: fetchBatchMerkleProof is available directly on the client (populated
+    // automatically when indexerApiEndpoint is supplied to getUmbraClient)
+    const fetchBatchMerkleProof = (client as any).fetchBatchMerkleProof;
+    if (!fetchBatchMerkleProof) {
+      throw new Error("Indexer not configured — supply NEXT_PUBLIC_UMBRA_INDEXER_API_ENDPOINT to enable private claims.");
+    }
+
     const claim = sdk.getReceiverClaimableUtxoToEncryptedBalanceClaimerFunction(
       { client },
       {

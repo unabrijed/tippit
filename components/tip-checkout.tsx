@@ -14,6 +14,7 @@ import { createPrivatePayment } from "@/lib/umbra/browser";
 import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
 import { withNetworkHeaders } from "@/lib/network-request";
 import { deserializeMagicBlockTransaction } from "@/lib/magicblock/tx";
+import { usePaymentRail } from "@/components/payment-rail-provider";
 
 const PRESETS = [1, 5, 10, 25];
 
@@ -32,7 +33,9 @@ export function TipCheckout({ creator }: { creator: CreatorProfileRecord }) {
   const [showMessage, setShowMessage] = useState(false);
   const [visibility, setVisibility] = useState<TipVisibility>("creator_only");
   const [state, setState] = useState<State>({ loading: false });
-  const isUmbra = creator.defaultRail === "umbra";
+  // Global store: magicblock is default; users can switch via PaymentRailSwitcher
+  const { rail } = usePaymentRail();
+  const isUmbra = rail === "umbra";
   const umbraSupport = getUmbraWalletSupport(wallet);
 
   const pay = async () => {
