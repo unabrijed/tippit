@@ -12,7 +12,7 @@ export default async function PayPage({ params }: { params: { slug: string } }) 
     <main className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-md flex-col items-center justify-center px-4 py-10">
       <SolanaWalletProvider>
         <div className="flex flex-col items-center gap-4 w-full">
-          <PaymentRailSwitcher />
+          {link.tokenType !== "SOL" && <PaymentRailSwitcher />}
           <PayFlow link={link} />
         </div>
       </SolanaWalletProvider>

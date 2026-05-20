@@ -14,6 +14,7 @@ import { useNetwork } from "@/components/network-provider";
 import { usePaymentRail } from "@/components/payment-rail-provider";
 import { StatusDot } from "@/components/brand-primitives";
 import { formatAmount } from "@/lib/format";
+import { extractApiError } from "@/lib/api-error";
 import { createPrivatePayment } from "@/lib/umbra/browser";
 import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
 import { withNetworkHeaders } from "@/lib/network-request";
@@ -74,7 +75,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const { setVisible } = useWalletModal();
   const [state, setState] = useState<State>({ loading: false });
   const { config, network } = useNetwork();
-  const { rail } = usePaymentRail();
+  const { rail, setRail } = usePaymentRail();
 
   const walletBalance = useWalletTokenBalance(link.tokenType, link.tokenMint, network);
 
@@ -82,6 +83,12 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const canPay = useMemo(() => link.status === "active" && !link.isExpired && networkMatches, [link.isExpired, link.status, networkMatches]);
   const umbraSupport = useMemo(() => getUmbraWalletSupport(wallet), [wallet]);
   const canPayPrivately = canPay && link.tokenType === "USDC" && connected && umbraSupport.supported;
+  const isSolPayment = link.tokenType === "SOL";
+
+  // SOL is not supported for private transfers — force public rail
+  useEffect(() => {
+    if (isSolPayment && rail === "magicblock") setRail("umbra");
+  }, [isSolPayment, rail, setRail]);
 
   const ensureSufficientBalance = async () => {
     if (!publicKey) throw new Error("Connect wallet.");
@@ -120,17 +127,19 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
         body: JSON.stringify({ paymentLinkId: link.id, payerWallet: publicKey.toBase58(), amount: String(link.amount), tokenType: link.tokenType, tokenMint: link.tokenMint })
       }, network));
       const intentData = await intentResponse.json();
-      if (!intentResponse.ok) throw new Error(intentData.error ?? "Intent failed.");
+      if (!intentResponse.ok) throw new Error(extractApiError(intentData, "Intent failed."));
 
       setState({ loading: true, step: "Authenticating…", mode: "magicblock" });
       let mbToken: string | undefined;
       if (signMessage) {
+        console.log("[pay-flow] starting MagicBlock auth for", publicKey.toBase58());
         const challengeRes = await fetch("/api/magicblock/challenge", withNetworkHeaders({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ walletAddress: publicKey.toBase58() })
         }, network));
         const challengeData = await challengeRes.json();
+        console.log("[pay-flow] challenge response", challengeRes.status, challengeData);
         if (challengeRes.ok && challengeData.challenge) {
           const msgBytes = new TextEncoder().encode(challengeData.challenge);
           const sig = await signMessage(msgBytes);
@@ -141,8 +150,18 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
             body: JSON.stringify({ walletAddress: publicKey.toBase58(), challenge: challengeData.challenge, signature: sigBase64 })
           }, network));
           const tokenData = await tokenRes.json();
-          if (tokenRes.ok && tokenData.token) mbToken = tokenData.token;
+          console.log("[pay-flow] auth-token response", tokenRes.status, tokenData);
+          if (tokenRes.ok && tokenData.token) {
+            mbToken = tokenData.token;
+            console.log("[pay-flow] auth token obtained ✓");
+          } else {
+            console.warn("[pay-flow] auth token missing — proceeding without token");
+          }
+        } else {
+          console.warn("[pay-flow] challenge failed — proceeding without token");
         }
+      } else {
+        console.warn("[pay-flow] signMessage not available — skipping auth");
       }
 
       setState({ loading: true, step: "Building…", mode: "magicblock" });
@@ -152,7 +171,8 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
         body: JSON.stringify({ payerWallet: publicKey.toBase58(), token: mbToken })
       }, network));
       const txData = await txResponse.json();
-      if (!txResponse.ok) throw new Error(txData.error ?? "Build failed.");
+      console.log("[pay-flow] build response", txResponse.status, txData);
+      if (!txResponse.ok) throw new Error(extractApiError(txData, "Build failed."));
 
       const unsignedTx = deserializeMagicBlockTransaction(txData.transactionBase64) as Transaction | VersionedTransaction;
       const signedTx = await signTransaction(unsignedTx);
@@ -170,7 +190,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
         body: JSON.stringify({ signature })
       }, network));
       const confirmData = await confirmResponse.json();
-      if (!confirmResponse.ok) throw new Error(confirmData.error ?? "Confirm failed.");
+      if (!confirmResponse.ok) throw new Error(extractApiError(confirmData, "Confirm failed."));
       setState({ loading: false, success: true, mode: "magicblock" });
       window.location.href = `/receipt/${confirmData.receipt.receiptCode}`;
     } catch (error) {
@@ -189,14 +209,14 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
         body: JSON.stringify({ paymentLinkId: link.id, payerWallet: publicKey?.toBase58(), amount: String(link.amount), tokenType: link.tokenType, tokenMint: link.tokenMint })
       }, network));
       const intentData = await intentResponse.json();
-      if (!intentResponse.ok) throw new Error(intentData.error ?? "Intent failed.");
+      if (!intentResponse.ok) throw new Error(extractApiError(intentData, "Intent failed."));
       const privateResult = await createPrivatePayment(wallet, { network, receiverAddress: link.receiverWallet, mint: link.tokenMint ?? "", amount: link.amount }, (step) => setState({ loading: true, step, mode: "umbra" }));
       const signature = privateResult.createUtxoSignature as string | undefined;
       if (!signature) throw new Error("No signature returned.");
       setState({ loading: true, step: "Confirming…", mode: "umbra" });
       const confirmResponse = await fetch(`/api/payment-intents/${intentData.id}/confirm`, withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature, umbraUtxoCommitment: signature }) }, network));
       const confirmData = await confirmResponse.json();
-      if (!confirmResponse.ok) throw new Error(confirmData.error ?? "Confirm failed.");
+      if (!confirmResponse.ok) throw new Error(extractApiError(confirmData, "Confirm failed."));
       setState({ loading: false, success: true, mode: "umbra" });
       window.location.href = `/receipt/${confirmData.receipt.receiptCode}`;
     } catch (error) {
@@ -215,11 +235,11 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       setState({ loading: true, step: "Creating…", mode: "public" });
       const intentResponse = await fetch("/api/payment-intents", withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentLinkId: link.id, payerWallet: publicKey.toBase58(), amount: String(link.amount), tokenType: link.tokenType, tokenMint: link.tokenMint }) }, network));
       const intentData = await intentResponse.json();
-      if (!intentResponse.ok) throw new Error(intentData.error ?? "Intent failed.");
+      if (!intentResponse.ok) throw new Error(extractApiError(intentData, "Intent failed."));
       setState({ loading: true, step: "Building…", mode: "public" });
       const txResponse = await fetch(`/api/payment-intents/${intentData.id}/build-transaction`, withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payerWallet: publicKey.toBase58() }) }, network));
       const txData = await txResponse.json();
-      if (!txResponse.ok) throw new Error(txData.error ?? "Build failed.");
+      if (!txResponse.ok) throw new Error(extractApiError(txData, "Build failed."));
       const transaction = Transaction.from(Buffer.from(txData.serializedTransaction, "base64"));
       const signed = await signTransaction(transaction);
       setState({ loading: true, step: "Sending…", mode: "public" });
@@ -229,7 +249,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       setState({ loading: true, step: "Confirming…", mode: "public" });
       const confirmResponse = await fetch(`/api/payment-intents/${intentData.id}/confirm`, withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature }) }, network));
       const confirmData = await confirmResponse.json();
-      if (!confirmResponse.ok) throw new Error(confirmData.error ?? "Confirm failed.");
+      if (!confirmResponse.ok) throw new Error(extractApiError(confirmData, "Confirm failed."));
       setState({ loading: false, success: true, mode: "public" });
       window.location.href = `/receipt/${confirmData.receipt.receiptCode}`;
     } catch (error) {
@@ -325,7 +345,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
         {!state.success && !state.loading ? (
           <Button
             onClick={!connected ? () => setVisible(true) : handlePay}
-            disabled={!canPay || (rail === "umbra" && connected && !umbraSupport.supported)}
+            disabled={!canPay || (rail === "umbra" && !isSolPayment && connected && !umbraSupport.supported)}
             className="w-full max-w-xs"
             size="lg"
           >

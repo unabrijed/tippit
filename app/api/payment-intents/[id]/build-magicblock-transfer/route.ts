@@ -25,22 +25,36 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const network = getNetworkFromRequest(request);
   const token: string | undefined = typeof body.token === "string" ? body.token : undefined;
 
+  const amountBaseUnits = String(Math.round(intent.amount * 1_000_000));
+  console.log("[build-magicblock-transfer] request", {
+    network,
+    intentId: intent.id,
+    fanWallet,
+    creatorWallet: intent.receiverWallet,
+    mint: intent.tokenMint,
+    amountBaseUnits,
+    tokenPresent: !!token,
+    intentStatus: intent.status,
+  });
+
   let tx;
   try {
     tx = await createMagicBlockTipTx({
       fanWallet,
       creatorWallet: intent.receiverWallet,
-      amountBaseUnits: String(Math.round(intent.amount * 1_000_000)),
+      amountBaseUnits,
       mint: intent.tokenMint,
       clientRefId: intent.id,
       network,
       token
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "MagicBlock transfer build failed.";
-    console.error("[build-magicblock-transfer]", message);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[build-magicblock-transfer] FAILED network=%s token_present=%s error=%s", network, !!token, message);
     return NextResponse.json({ error: message }, { status: 502 });
   }
+
+  console.log("[build-magicblock-transfer] success", { sendTo: tx.sendTo, validator: tx.validator });
 
   return NextResponse.json({
     ...tx,

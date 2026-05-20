@@ -13,6 +13,7 @@ import { useNetwork } from "@/components/network-provider";
 import { createPrivatePayment } from "@/lib/umbra/browser";
 import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
 import { withNetworkHeaders } from "@/lib/network-request";
+import { extractApiError } from "@/lib/api-error";
 import { deserializeMagicBlockTransaction } from "@/lib/magicblock/tx";
 import { usePaymentRail } from "@/components/payment-rail-provider";
 
@@ -53,7 +54,7 @@ export function TipCheckout({ creator }: { creator: CreatorProfileRecord }) {
         body: JSON.stringify({ creatorSlug: creator.slug, amount: toBaseUnits(amountUi), amountUi, message, visibility, fanWalletAddress: publicKey.toBase58() })
       }, network));
       const intent = await intentResponse.json();
-      if (!intentResponse.ok) throw new Error(intent.error || "Intent failed.");
+      if (!intentResponse.ok) throw new Error(extractApiError(intent, "Intent failed."));
 
       let signature = "";
 
@@ -94,7 +95,7 @@ export function TipCheckout({ creator }: { creator: CreatorProfileRecord }) {
           body: JSON.stringify({ clientRefId: intent.clientRefId, fanWallet: publicKey.toBase58(), token: mbToken })
         }, network));
         const txData = await txResponse.json();
-        if (!txResponse.ok) throw new Error(txData.error || "Build failed.");
+        if (!txResponse.ok) throw new Error(extractApiError(txData, "Build failed."));
         const unsignedTx = deserializeMagicBlockTransaction(txData.transactionBase64) as Transaction | VersionedTransaction;
         const signedTx = await signTransaction(unsignedTx);
         setState({ loading: true, step: "Sending…" });
@@ -107,7 +108,7 @@ export function TipCheckout({ creator }: { creator: CreatorProfileRecord }) {
       setState({ loading: true, step: "Confirming…" });
       const confirmResponse = await fetch("/api/tips/confirm", withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientRefId: intent.clientRefId, txSignature: signature }) }, network));
       const confirmData = await confirmResponse.json();
-      if (!confirmResponse.ok) throw new Error(confirmData.error || "Confirm failed.");
+      if (!confirmResponse.ok) throw new Error(extractApiError(confirmData, "Confirm failed."));
 
       setState({ loading: false, success: true });
       setMessage("");

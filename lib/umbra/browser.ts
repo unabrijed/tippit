@@ -47,7 +47,7 @@ function getStandardWalletAccount(wallet: Wallet | null) {
 }
 
 async function getClient(wallet: Wallet | null, network: AppNetwork) {
-  const { sdk } = await getUmbraDeps();
+  const { sdk, prover } = await getUmbraDeps();
   const { standardWallet, account } = getStandardWalletAccount(wallet);
   const signer = sdk.createSignerFromWalletAccount(standardWallet, account);
   const appEnv = getAppEnv(network);
@@ -59,15 +59,17 @@ async function getClient(wallet: Wallet | null, network: AppNetwork) {
     rpcSubscriptionsUrl: toSubscriptionsUrl(rpcUrl),
     indexerApiEndpoint: appEnv.umbraIndexerApiEndpoint
   });
-  return { sdk, signer, client };
+  return { sdk, prover, signer, client };
 }
 
 export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwork, onProgress?: ProgressCallback) {
   try {
     onProgress?.("Preparing Umbra wallet registration…");
-    const { sdk, client } = await getClient(wallet, network);
-    // SDK v4+: registration no longer requires a zkProver — pass no deps
-    const register = sdk.getUserRegistrationFunction({ client });
+    const { sdk, prover, client } = await getClient(wallet, network);
+    const register = sdk.getUserRegistrationFunction(
+      { client },
+      { zkProver: prover.getUserRegistrationProver() }
+    );
     const result = await register({ confidential: true, anonymous: true });
     onProgress?.("Umbra registration ready.");
     return result;
@@ -78,8 +80,7 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
 
 export async function createPrivatePayment(wallet: Wallet | null, args: { receiverAddress: string; mint: string; amount: number; network: AppNetwork }, onProgress?: ProgressCallback) {
   try {
-    const { sdk, client } = await getClient(wallet, args.network);
-    const { prover } = await getUmbraDeps();
+    const { sdk, prover, client } = await getClient(wallet, args.network);
 
     await registerUmbraUser(wallet, args.network, onProgress);
     onProgress?.("Generating private tip proof…");
@@ -127,8 +128,7 @@ function extractClaimSignature(result: any) {
 
 export async function claimLatestPrivatePayment(wallet: Wallet | null, args: { receiverAddress: string; amount: number; network: AppNetwork }, onProgress?: ProgressCallback) {
   try {
-    const { sdk, client } = await getClient(wallet, args.network);
-    const { prover } = await getUmbraDeps();
+    const { sdk, prover, client } = await getClient(wallet, args.network);
     const appEnv = getAppEnv(args.network);
     const relayer = sdk.getUmbraRelayer({ apiEndpoint: appEnv.umbraRelayerApiEndpoint });
 
