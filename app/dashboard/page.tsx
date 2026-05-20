@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { CurrencyCircleDollar, ShieldCheck, Link as LinkIcon } from "@phosphor-icons/react";
-import dynamic from "next/dynamic";
 import type { DashboardPayload } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
 import { PaymentCard } from "@/components/payment-card";
@@ -14,9 +13,8 @@ import { useNetwork } from "@/components/network-provider";
 import { withNetworkHeaders } from "@/lib/network-request";
 import { SolanaWalletProvider } from "@/components/solana-wallet-provider";
 import { MetricTile } from "@/components/brand-primitives";
-
-const ClaimCard = dynamic(() => import("@/components/claim-card").then((m) => m.ClaimCard), { ssr: false });
-const UmbraReadinessCard = dynamic(() => import("@/components/umbra-readiness-card").then((m) => m.UmbraReadinessCard), { ssr: false });
+import { ClaimCard } from "@/components/claim-card";
+import { UmbraReadinessCard } from "@/components/umbra-readiness-card";
 
 const successfulIntentStatuses = new Set(["claimable", "claimed"]);
 
@@ -44,13 +42,20 @@ function DashboardPageContent() {
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error ?? "Load failed.");
-        if (active) { setData(payload); setError(null); }
+        if (active) {
+          setData(payload);
+          setError(null);
+        }
       })
       .catch((value) => {
         if (active) setError(value instanceof Error ? value.message : "Load failed.");
       })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [network, publicKey]);
 
   const dashboard = useMemo(() => {

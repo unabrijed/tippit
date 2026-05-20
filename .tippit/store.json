@@ -27,9 +27,115 @@
       "expiresAt": "2026-05-20T18:04:00.000Z",
       "createdAt": "2026-05-19T23:34:22.578Z",
       "updatedAt": "2026-05-19T23:34:22.578Z"
+    },
+    {
+      "id": "2c2026a8-b1cc-4b52-808f-c0c1fcb77e84",
+      "merchantId": "5c25248c-e559-4e64-81b7-5e8e092569fc",
+      "receiverWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "displayName": "Tippit creator",
+      "slug": "private-support-2c2026",
+      "title": "Private support",
+      "amount": 1,
+      "tokenType": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "tokenSymbol": "USDC",
+      "network": "mainnet",
+      "linkType": "one_time",
+      "privacyMode": "umbra_utxo",
+      "status": "active",
+      "expiresAt": "2026-05-21T00:05:00.000Z",
+      "createdAt": "2026-05-20T05:35:41.229Z",
+      "updatedAt": "2026-05-20T05:35:41.229Z"
+    },
+    {
+      "id": "b4dfc55c-6b35-4d04-acaa-6ec06a44f09e",
+      "merchantId": "5c25248c-e559-4e64-81b7-5e8e092569fc",
+      "receiverWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "displayName": "Tippit creator",
+      "slug": "private-support-b4dfc5",
+      "title": "Private support",
+      "amount": 0.001,
+      "tokenType": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "tokenSymbol": "USDC",
+      "network": "mainnet",
+      "linkType": "one_time",
+      "privacyMode": "umbra_utxo",
+      "status": "active",
+      "expiresAt": "2026-05-21T00:06:00.000Z",
+      "createdAt": "2026-05-20T05:36:09.210Z",
+      "updatedAt": "2026-05-20T05:36:09.210Z"
     }
   ],
-  "paymentIntents": [],
+  "paymentIntents": [
+    {
+      "id": "cca21066-5f82-42b2-99fb-7178e34a911d",
+      "paymentLinkId": "b4dfc55c-6b35-4d04-acaa-6ec06a44f09e",
+      "linkTitle": "Private support",
+      "receiverWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "payerWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "amount": 0.001,
+      "tokenType": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "tokenSymbol": "USDC",
+      "network": "mainnet",
+      "status": "awaiting_signature",
+      "createdAt": "2026-05-20T05:36:15.950Z",
+      "updatedAt": "2026-05-20T05:36:15.950Z",
+      "expiresAt": "2026-05-20T06:36:15.950Z"
+    },
+    {
+      "id": "bb703b4d-de9e-449a-9d22-af542e370dd7",
+      "paymentLinkId": "b4dfc55c-6b35-4d04-acaa-6ec06a44f09e",
+      "linkTitle": "Private support",
+      "receiverWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "payerWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "amount": 0.001,
+      "tokenType": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "tokenSymbol": "USDC",
+      "network": "mainnet",
+      "status": "awaiting_signature",
+      "createdAt": "2026-05-20T05:38:32.722Z",
+      "updatedAt": "2026-05-20T05:38:32.722Z",
+      "expiresAt": "2026-05-20T06:38:32.722Z"
+    },
+    {
+      "id": "35805c8e-8d29-4fe8-ae81-2e7aa9757704",
+      "paymentLinkId": "b4dfc55c-6b35-4d04-acaa-6ec06a44f09e",
+      "linkTitle": "Private support",
+      "receiverWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "payerWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "amount": 0.001,
+      "tokenType": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "tokenSymbol": "USDC",
+      "network": "mainnet",
+      "status": "awaiting_signature",
+      "createdAt": "2026-05-20T05:39:38.620Z",
+      "updatedAt": "2026-05-20T05:39:38.620Z",
+      "expiresAt": "2026-05-20T06:39:38.620Z"
+    }
+  ],
   "receipts": [],
-  "paymentEvents": []
+  "paymentEvents": [
+    {
+      "id": "bf5f0755-3e62-4df2-92e1-749cc1ae73e4",
+      "paymentIntentId": "cca21066-5f82-42b2-99fb-7178e34a911d",
+      "eventType": "payment_intent.created",
+      "createdAt": "2026-05-20T05:36:15.950Z"
+    },
+    {
+      "id": "5d1423b7-df23-4fa9-b87a-fc6934c29b38",
+      "paymentIntentId": "bb703b4d-de9e-449a-9d22-af542e370dd7",
+      "eventType": "payment_intent.created",
+      "createdAt": "2026-05-20T05:38:32.722Z"
+    },
+    {
+      "id": "a3d7bc68-5009-4e3a-ac6c-a6e6d9ace78c",
+      "paymentIntentId": "35805c8e-8d29-4fe8-ae81-2e7aa9757704",
+      "eventType": "payment_intent.created",
+      "createdAt": "2026-05-20T05:39:38.620Z"
+    }
+  ]
 }

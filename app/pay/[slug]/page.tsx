@@ -1,12 +1,7 @@
 import { notFound } from "next/navigation";
-import dynamic from "next/dynamic";
 import { getPaymentLinkBySlug } from "@/lib/db/store";
 import { SolanaWalletProvider } from "@/components/solana-wallet-provider";
-
-const PayFlow = dynamic(
-  () => import("@/components/pay-flow").then((m) => m.PayFlow),
-  { ssr: false, loading: () => <div className="mx-auto h-[400px] max-w-md animate-pulse rounded-2xl border border-border bg-white/60" /> }
-);
+import { PayFlow } from "@/components/pay-flow";
 
 export default async function PayPage({ params }: { params: { slug: string } }) {
   const link = await getPaymentLinkBySlug(params.slug);
