@@ -22,6 +22,7 @@ function normalizeUmbraError(error: unknown) {
   if (message.includes("User rejected") || message.includes("declined") || message.includes("rejected")) return "The wallet request was cancelled.";
   if (message.includes("No matching private payment")) return message.replaceAll("private payment", "private tip");
   if (message.includes("fetch") || message.includes("network")) return "Umbra network services were unreachable. Check RPC, indexer, or relayer configuration and try again.";
+  if (message.toLowerCase().includes("simulation") || message.toLowerCase().includes("simulate")) return "Transaction simulation failed. The recipient may not have a registered Umbra account, or there may be insufficient SOL for fees. Please try again.";
   return message;
 }
 
@@ -81,6 +82,13 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
 export async function createPrivatePayment(wallet: Wallet | null, args: { receiverAddress: string; mint: string; amount: number; network: AppNetwork }, onProgress?: ProgressCallback) {
   try {
     const { sdk, prover, client } = await getClient(wallet, args.network);
+
+    onProgress?.("Checking recipient Umbra registration…");
+    const queryAccount = sdk.getUserAccountQuerierFunction({ client });
+    const receiverAccount = await queryAccount(args.receiverAddress as any);
+    if (receiverAccount.state === "non_existent") {
+      throw new Error("The recipient hasn't registered their private wallet with Umbra yet and cannot receive private tips.");
+    }
 
     await registerUmbraUser(wallet, args.network, onProgress);
     onProgress?.("Generating private tip proof…");
