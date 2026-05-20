@@ -23,6 +23,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const network = getNetworkFromRequest(request);
+  const token: string | undefined = typeof body.token === "string" ? body.token : undefined;
 
   let tx;
   try {
@@ -32,7 +33,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       amountBaseUnits: String(Math.round(intent.amount * 1_000_000)),
       mint: intent.tokenMint,
       clientRefId: intent.id,
-      network
+      network,
+      token
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "MagicBlock transfer build failed.";
@@ -42,6 +44,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   return NextResponse.json({
     ...tx,
-    rpcUrl: resolveMagicBlockRpc(tx, network)
+    rpcUrl: resolveMagicBlockRpc(tx, network, token)
   });
 }

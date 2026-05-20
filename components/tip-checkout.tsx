@@ -25,7 +25,7 @@ function toBaseUnits(amountUi: number) {
 }
 
 export function TipCheckout({ creator }: { creator: CreatorProfileRecord }) {
-  const { publicKey, connected, signTransaction, wallet } = useWallet();
+  const { publicKey, connected, signTransaction, signMessage, wallet } = useWallet();
   const { setVisible } = useWalletModal();
   const { network } = useNetwork();
   const [amountUi, setAmountUi] = useState<number>(5);
@@ -63,17 +63,45 @@ export function TipCheckout({ creator }: { creator: CreatorProfileRecord }) {
         if (!signature) throw new Error("No signature.");
       } else {
         if (!signTransaction) throw new Error("Wallet cannot sign.");
+
+        setState({ loading: true, step: "Authenticating…" });
+        let mbToken: string | undefined;
+        if (signMessage) {
+          const challengeRes = await fetch("/api/magicblock/challenge", withNetworkHeaders({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ walletAddress: publicKey.toBase58() })
+          }, network));
+          const challengeData = await challengeRes.json();
+          if (challengeRes.ok && challengeData.challenge) {
+            const msgBytes = new TextEncoder().encode(challengeData.challenge);
+            const sig = await signMessage(msgBytes);
+            const sigBase64 = Buffer.from(sig).toString("base64");
+            const tokenRes = await fetch("/api/magicblock/auth-token", withNetworkHeaders({
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ walletAddress: publicKey.toBase58(), challenge: challengeData.challenge, signature: sigBase64 })
+            }, network));
+            const tokenData = await tokenRes.json();
+            if (tokenRes.ok && tokenData.token) mbToken = tokenData.token;
+          }
+        }
+
         setState({ loading: true, step: "Building…" });
-        const txResponse = await fetch("/api/tips/build-magicblock-transfer", withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientRefId: intent.clientRefId, fanWallet: publicKey.toBase58() }) }, network));
+        const txResponse = await fetch("/api/tips/build-magicblock-transfer", withNetworkHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientRefId: intent.clientRefId, fanWallet: publicKey.toBase58(), token: mbToken })
+        }, network));
         const txData = await txResponse.json();
         if (!txResponse.ok) throw new Error(txData.error || "Build failed.");
         const unsignedTx = deserializeMagicBlockTransaction(txData.transactionBase64) as Transaction | VersionedTransaction;
         const signedTx = await signTransaction(unsignedTx);
         setState({ loading: true, step: "Sending…" });
-        const connection = new Connection(txData.rpcUrl, "confirmed");
-        signature = await connection.sendRawTransaction(signedTx.serialize());
-        const latestBlockhash = await connection.getLatestBlockhash();
-        await connection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
+        const rpcConnection = new Connection(txData.rpcUrl, "confirmed");
+        signature = await rpcConnection.sendRawTransaction(signedTx.serialize());
+        const latestBlockhash = await rpcConnection.getLatestBlockhash();
+        await rpcConnection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
       }
 
       setState({ loading: true, step: "Confirming…" });

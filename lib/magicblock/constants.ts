@@ -14,8 +14,8 @@ export function getMagicBlockEphemeralRpc(network: AppNetwork) {
     : process.env.NEXT_PUBLIC_MAGICBLOCK_EPHEMERAL_RPC_DEVNET || process.env.MAGICBLOCK_EPHEMERAL_RPC_DEVNET;
 }
 
-export function getMagicBlockSponsorApiKey(network: AppNetwork) {
+export function getMagicBlockTeeBase(network: AppNetwork) {
   return network === "mainnet"
-    ? process.env.MAGICBLOCK_SPONSOR_API_KEY_MAINNET || process.env.MAGICBLOCK_SPONSOR_API_KEY
-    : process.env.MAGICBLOCK_SPONSOR_API_KEY_DEVNET || process.env.MAGICBLOCK_SPONSOR_API_KEY;
+    ? process.env.NEXT_PUBLIC_MAGICBLOCK_TEE_BASE_MAINNET || "https://mainnet-tee.magicblock.app"
+    : process.env.NEXT_PUBLIC_MAGICBLOCK_TEE_BASE_DEVNET || "https://devnet-tee.magicblock.app";
 }

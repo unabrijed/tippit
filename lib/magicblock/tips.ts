@@ -1,6 +1,5 @@
 import type { AppNetwork } from "@/lib/network";
 import { magicBlockFetch, withCluster } from "@/lib/magicblock/api";
-import { getMagicBlockSponsorApiKey } from "@/lib/magicblock/constants";
 import type { MagicBlockUnsignedTransaction } from "@/lib/tippit/types";
 
 export async function createMagicBlockTipTx(input: {
@@ -12,10 +11,9 @@ export async function createMagicBlockTipTx(input: {
   network: AppNetwork;
   token?: string;
 }) {
-  const token = input.token ?? getMagicBlockSponsorApiKey(input.network);
   return magicBlockFetch<MagicBlockUnsignedTransaction>("/v1/spl/transfer", {
     method: "POST",
-    token,
+    token: input.token,
     body: JSON.stringify(withCluster(input.network, {
       from: input.fanWallet,
       to: input.creatorWallet,

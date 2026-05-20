@@ -21,7 +21,8 @@ export const createTipSchema = z.object({
 
 export const buildTipTransferSchema = z.object({
   clientRefId: z.string().min(1),
-  fanWallet: z.string().min(32)
+  fanWallet: z.string().min(32),
+  token: z.string().min(1).optional()
 });
 
 export const confirmTipSchema = z.object({

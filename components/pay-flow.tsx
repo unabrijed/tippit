@@ -69,7 +69,7 @@ function useWalletTokenBalance(tokenType: "USDC" | "SOL" | string, tokenMint: st
 }
 
 export function PayFlow({ link }: { link: PaymentLinkRecord }) {
-  const { publicKey, connected, signTransaction, wallet } = useWallet();
+  const { publicKey, connected, signTransaction, signMessage, wallet } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
   const [state, setState] = useState<State>({ loading: false });
@@ -122,11 +122,34 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       const intentData = await intentResponse.json();
       if (!intentResponse.ok) throw new Error(intentData.error ?? "Intent failed.");
 
+      setState({ loading: true, step: "Authenticating…", mode: "magicblock" });
+      let mbToken: string | undefined;
+      if (signMessage) {
+        const challengeRes = await fetch("/api/magicblock/challenge", withNetworkHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ walletAddress: publicKey.toBase58() })
+        }, network));
+        const challengeData = await challengeRes.json();
+        if (challengeRes.ok && challengeData.challenge) {
+          const msgBytes = new TextEncoder().encode(challengeData.challenge);
+          const sig = await signMessage(msgBytes);
+          const sigBase64 = Buffer.from(sig).toString("base64");
+          const tokenRes = await fetch("/api/magicblock/auth-token", withNetworkHeaders({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ walletAddress: publicKey.toBase58(), challenge: challengeData.challenge, signature: sigBase64 })
+          }, network));
+          const tokenData = await tokenRes.json();
+          if (tokenRes.ok && tokenData.token) mbToken = tokenData.token;
+        }
+      }
+
       setState({ loading: true, step: "Building…", mode: "magicblock" });
       const txResponse = await fetch(`/api/payment-intents/${intentData.id}/build-magicblock-transfer`, withNetworkHeaders({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payerWallet: publicKey.toBase58() })
+        body: JSON.stringify({ payerWallet: publicKey.toBase58(), token: mbToken })
       }, network));
       const txData = await txResponse.json();
       if (!txResponse.ok) throw new Error(txData.error ?? "Build failed.");
@@ -134,7 +157,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       const unsignedTx = deserializeMagicBlockTransaction(txData.transactionBase64) as Transaction | VersionedTransaction;
       const signedTx = await signTransaction(unsignedTx);
       setState({ loading: true, step: "Sending…", mode: "magicblock" });
-      const rpcUrl = txData.rpcUrl ?? resolveMagicBlockRpc(txData, network);
+      const rpcUrl = txData.rpcUrl ?? resolveMagicBlockRpc(txData, network, mbToken);
       const mbConnection = new Connection(rpcUrl, "confirmed");
       const signature = await mbConnection.sendRawTransaction(signedTx.serialize());
       const latestBlockhash = await mbConnection.getLatestBlockhash();
