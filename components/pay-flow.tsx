@@ -80,10 +80,11 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const walletBalance = useWalletTokenBalance(link.tokenType, link.tokenMint, network);
 
   const networkMatches = link.network === network;
-  const canPay = useMemo(() => link.status === "active" && !link.isExpired && networkMatches, [link.isExpired, link.status, networkMatches]);
+  const isSolPayment = link.tokenType === "SOL";
+  const solDisabled = isSolPayment;
+  const canPay = useMemo(() => link.status === "active" && !link.isExpired && networkMatches && !solDisabled, [link.isExpired, link.status, networkMatches, solDisabled]);
   const umbraSupport = useMemo(() => getUmbraWalletSupport(wallet), [wallet]);
   const canPayPrivately = canPay && link.tokenType === "USDC" && connected && umbraSupport.supported;
-  const isSolPayment = link.tokenType === "SOL";
 
   // SOL is not supported for private transfers — force public rail
   useEffect(() => {
@@ -326,7 +327,12 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
         )}
 
         {/* Error */}
-        {state.error ? (
+        {solDisabled ? (
+          <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+            <WarningCircle className="h-4 w-4" aria-hidden />
+            SOL payments are disabled. Please create and use USDC links only.
+          </div>
+        ) : state.error ? (
           <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
             <WarningCircle className="h-4 w-4" aria-hidden />
             {state.error}
@@ -349,16 +355,18 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
             className="w-full max-w-xs"
             size="lg"
           >
-            {!connected
-              ? "Connect wallet"
-              : link.isExpired
-                ? "Expired"
-                : `Pay ${formatAmount(link.amount, link.tokenSymbol)}`}
+            {solDisabled
+              ? "Unavailable"
+              : !connected
+                ? "Connect wallet"
+                : link.isExpired
+                  ? "Expired"
+                  : `Pay ${formatAmount(link.amount, link.tokenSymbol)}`}
           </Button>
         ) : null}
 
-        {/* QR toggle — only for public rail */}
-        {rail !== "magicblock" && !isPrivate && !state.loading ? <SolanaPayQr slug={link.slug} /> : null}
+        {/* QR toggle — only for public rail on non-private links */}
+        {rail !== "magicblock" && !isPrivate && link.privacyMode !== "umbra_utxo" && !state.loading ? <SolanaPayQr slug={link.slug} /> : null}
       </CardContent>
     </Card>
   );

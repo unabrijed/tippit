@@ -2,6 +2,13 @@ import type { AppNetwork } from "@/lib/network";
 import { magicBlockFetch, withCluster } from "@/lib/magicblock/api";
 import type { MagicBlockUnsignedTransaction } from "@/lib/tippit/types";
 
+// MagicBlock requires clientRefId to be a non-negative bigint string.
+// Derive one by treating the first 15 hex digits of the UUID (without hyphens) as a BigInt.
+function toNumericRefId(uuid: string): string {
+  const hex = uuid.replace(/-/g, "").slice(0, 15);
+  return BigInt(`0x${hex}`).toString();
+}
+
 export async function createMagicBlockTipTx(input: {
   fanWallet: string;
   creatorWallet: string;
@@ -26,7 +33,7 @@ export async function createMagicBlockTipTx(input: {
       initAtasIfMissing: true,
       initVaultIfMissing: true,
       memo: `Tippit:${input.clientRefId}`,
-      clientRefId: input.clientRefId,
+      clientRefId: toNumericRefId(input.clientRefId),
       split: 1,
       gasless: true,
       minDelayMs: "0",

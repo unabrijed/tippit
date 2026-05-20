@@ -327,6 +327,7 @@ export async function upsertMerchant(walletAddress: string, displayName?: string
 }
 
 export async function createPaymentLink(input: PaymentLinkInsert): Promise<PaymentLinkRecord> {
+  if (input.tokenType !== "USDC") throw new Error("SOL links are disabled.");
   if (isPrismaAvailable()) {
     const db = getPrisma();
     const merchant = await upsertMerchant(input.receiverWallet, input.displayName, input.network);
@@ -484,6 +485,7 @@ export async function createPaymentIntent(input: { paymentLinkId: string; payerW
   if (link.network !== input.network) throw new Error(`This tip link belongs to ${link.network}, but ${input.network} is selected.`);
   if (link.status !== "active") throw new Error("This tip link is not active.");
   if (link.isExpired) throw new Error("This tip link has expired.");
+  if (link.tokenType !== "USDC") throw new Error("SOL payments are disabled.");
 
   if (isPrismaAvailable()) {
     const db = getPrisma();

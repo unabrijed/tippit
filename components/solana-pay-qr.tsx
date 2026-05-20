@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { QrCode } from "@phosphor-icons/react";
+import { ArrowSquareOut, QrCode } from "@phosphor-icons/react";
 import { useNetwork } from "@/components/network-provider";
 import { withNetworkHeaders } from "@/lib/network-request";
 
@@ -22,7 +22,10 @@ export function SolanaPayQr({ slug }: { slug: string }) {
     fetch(`/api/solana-pay/${slug}`, withNetworkHeaders(undefined, network))
       .then(async (response) => {
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? "QR unavailable.");
+        if (!response.ok) {
+          if (active) setState({ error: data.error ?? "QR unavailable.", checkoutUrl: data.checkoutUrl });
+          return;
+        }
         if (active) setState({ url: data.url, checkoutUrl: data.checkoutUrl });
       })
       .catch((error) => {
@@ -34,7 +37,20 @@ export function SolanaPayQr({ slug }: { slug: string }) {
     };
   }, [network, slug]);
 
-  if (state.error || !state.url) return null;
+  if (state.error) {
+    if (!state.checkoutUrl) return null;
+    return (
+      <a
+        href={state.checkoutUrl}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+      >
+        Open checkout to send with Umbra
+        <ArrowSquareOut className="h-3.5 w-3.5" />
+      </a>
+    );
+  }
+
+  if (!state.url) return null;
 
   return (
     <div className="flex flex-col items-center gap-3">

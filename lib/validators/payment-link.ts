@@ -4,7 +4,7 @@ export const paymentLinkSchema = z.object({
   title: z.string().min(3, "Add a clear payment title."),
   description: z.string().optional(),
   amount: z.coerce.number().positive("Amount must be greater than zero."),
-  tokenType: z.enum(["USDC", "SOL"]).default("USDC"),
+  tokenType: z.literal("USDC").default("USDC"),
   tokenMint: z.string().min(20, "Provide a valid token mint.").optional(),
   privacyMode: z.enum(["umbra_utxo", "public_transfer"]).optional(),
   linkType: z.enum(["one_time", "reusable"]).default("one_time"),

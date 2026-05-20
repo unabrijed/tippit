@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { withNetworkHeaders } from "@/lib/network-request";
-import { getTokenConfig, type SupportedToken } from "@/lib/solana/tokens";
+import { getTokenConfig } from "@/lib/solana/tokens";
 
 export function CreateLinkForm() {
   const { publicKey, connected } = useWallet();
@@ -22,7 +22,7 @@ export function CreateLinkForm() {
     title: "Private support",
     description: "",
     amount: String(defaultUsdc.defaultAmount),
-    tokenType: "USDC" as SupportedToken,
+    tokenType: "USDC" as const,
     tokenMint: defaultUsdc.mint ?? "",
     privacyMode: "umbra_utxo" as "umbra_utxo" | "public_transfer",
     linkType: "one_time",
@@ -31,26 +31,15 @@ export function CreateLinkForm() {
   });
 
   useEffect(() => {
-    const active = getTokenConfig(form.tokenType, network);
+    const active = getTokenConfig("USDC", network);
     setForm((current) => ({
       ...current,
       amount: String(active.defaultAmount),
       tokenMint: active.mint ?? ""
     }));
-  }, [network, form.tokenType]);
+  }, [network]);
 
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-
-  const updateTokenType = (tokenType: SupportedToken) => {
-    const token = getTokenConfig(tokenType, network);
-    setForm((current) => ({
-      ...current,
-      tokenType,
-      amount: String(token.defaultAmount),
-      tokenMint: token.mint ?? "",
-      privacyMode: tokenType === "USDC" ? "umbra_utxo" : "public_transfer"
-    }));
-  };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -178,22 +167,10 @@ export function CreateLinkForm() {
                 placeholder="0"
                 aria-label="Amount"
               />
-              {/* Token toggle */}
-              <div className="flex items-center gap-1 pb-2">
-                {(["USDC", "SOL"] as SupportedToken[]).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => updateTokenType(t)}
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition ${
-                      form.tokenType === t
-                        ? "bg-foreground text-white"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
+              <div className="pb-2">
+                <span className="rounded-full bg-foreground px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-white">
+                  USDC
+                </span>
               </div>
             </div>
             {errors.amount ? <p className="text-xs text-destructive">{errors.amount}</p> : null}
