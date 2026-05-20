@@ -12,9 +12,18 @@ export async function magicBlockFetch<T>(path: string, options?: RequestInit & {
     cache: "no-store"
   });
 
-  const data = (await response.json()) as T | { error?: string; message?: string };
+  let data: T | { error?: string; message?: string } | null = null;
+  try {
+    data = (await response.json()) as T | { error?: string; message?: string };
+  } catch {
+    if (!response.ok) {
+      throw new Error(`MagicBlock request failed: ${response.status}`);
+    }
+  }
+
   if (!response.ok) {
-    const message = (data as { error?: string; message?: string }).error || (data as { error?: string; message?: string }).message || `MagicBlock request failed: ${response.status}`;
+    const errData = data as { error?: string; message?: string } | null;
+    const message = errData?.error || errData?.message || `MagicBlock request failed: ${response.status}`;
     throw new Error(message);
   }
 

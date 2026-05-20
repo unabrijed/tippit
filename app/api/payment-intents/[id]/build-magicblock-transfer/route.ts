@@ -24,14 +24,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const network = getNetworkFromRequest(request);
 
-  const tx = await createMagicBlockTipTx({
-    fanWallet,
-    creatorWallet: intent.receiverWallet,
-    amountBaseUnits: String(Math.round(intent.amount * 1_000_000)),
-    mint: intent.tokenMint,
-    clientRefId: intent.id,
-    network
-  });
+  let tx;
+  try {
+    tx = await createMagicBlockTipTx({
+      fanWallet,
+      creatorWallet: intent.receiverWallet,
+      amountBaseUnits: String(Math.round(intent.amount * 1_000_000)),
+      mint: intent.tokenMint,
+      clientRefId: intent.id,
+      network
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "MagicBlock transfer build failed.";
+    console.error("[build-magicblock-transfer]", message);
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   return NextResponse.json({
     ...tx,

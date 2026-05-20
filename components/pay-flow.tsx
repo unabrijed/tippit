@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle, Lock, LockOpen, WarningCircle } from "@phosphor-icons/react";
 import { Connection, PublicKey, Transaction, type VersionedTransaction } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
@@ -18,10 +18,55 @@ import { createPrivatePayment } from "@/lib/umbra/browser";
 import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
 import { withNetworkHeaders } from "@/lib/network-request";
 import { deserializeMagicBlockTransaction, resolveMagicBlockRpc } from "@/lib/magicblock/tx";
+import { getDefaultUsdcMint } from "@/lib/solana/tokens";
 
 type State = { loading: boolean; step?: string; error?: string; success?: boolean; mode?: "magicblock" | "umbra" | "public" };
+type BalanceState = { value: number | null; loading: boolean };
 
 const SOL_FEE_BUFFER = 0.00001;
+
+function useWalletTokenBalance(tokenType: "USDC" | "SOL" | string, tokenMint: string | null | undefined, network: string) {
+  const { publicKey, connected } = useWallet();
+  const { connection } = useConnection();
+  const [balance, setBalance] = useState<BalanceState>({ value: null, loading: false });
+
+  useEffect(() => {
+    if (!connected || !publicKey) {
+      setBalance({ value: null, loading: false });
+      return;
+    }
+
+    let cancelled = false;
+    setBalance({ value: null, loading: true });
+
+    (async () => {
+      try {
+        if (tokenType === "SOL") {
+          const lamports = await connection.getBalance(publicKey, "confirmed");
+          if (!cancelled) setBalance({ value: lamports / 1_000_000_000, loading: false });
+        } else {
+          const mintAddress = tokenMint ?? getDefaultUsdcMint(network as "mainnet" | "devnet");
+          const mint = new PublicKey(mintAddress);
+          const ata = getAssociatedTokenAddressSync(mint, publicKey);
+          const accountInfo = await connection.getAccountInfo(ata, "confirmed");
+          if (!accountInfo) {
+            if (!cancelled) setBalance({ value: 0, loading: false });
+            return;
+          }
+          const tokenBalance = await connection.getTokenAccountBalance(ata, "confirmed");
+          const amount = Number(tokenBalance.value.uiAmountString ?? tokenBalance.value.uiAmount ?? 0);
+          if (!cancelled) setBalance({ value: amount, loading: false });
+        }
+      } catch {
+        if (!cancelled) setBalance({ value: null, loading: false });
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [connected, publicKey, connection, tokenType, tokenMint, network]);
+
+  return balance;
+}
 
 export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const { publicKey, connected, signTransaction, wallet } = useWallet();
@@ -30,6 +75,8 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const [state, setState] = useState<State>({ loading: false });
   const { config, network } = useNetwork();
   const { rail } = usePaymentRail();
+
+  const walletBalance = useWalletTokenBalance(link.tokenType, link.tokenMint, network);
 
   const networkMatches = link.network === network;
   const canPay = useMemo(() => link.status === "active" && !link.isExpired && networkMatches, [link.isExpired, link.status, networkMatches]);
@@ -210,6 +257,30 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
           {isPrivate ? <Lock className="h-3.5 w-3.5 text-accent" /> : <LockOpen className="h-3.5 w-3.5" />}
           {isPrivate ? "Private" : "Public"}
         </div>
+
+        {/* Wallet balance */}
+        {connected && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs">
+            <span className="text-muted-foreground">Your balance:</span>
+            {walletBalance.loading ? (
+              <span className="h-3 w-12 animate-pulse rounded bg-muted-foreground/20" />
+            ) : walletBalance.value !== null ? (
+              <span
+                className={`font-semibold tabular-nums ${
+                  walletBalance.value < link.amount ? "text-destructive" : "text-foreground"
+                }`}
+              >
+                {walletBalance.value.toLocaleString(undefined, { maximumFractionDigits: link.tokenType === "SOL" ? 6 : 2 })}{" "}
+                <span className="font-normal text-muted-foreground">{link.tokenSymbol}</span>
+              </span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+            <span className="ml-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              {network}
+            </span>
+          </div>
+        )}
 
         {/* Error */}
         {state.error ? (
