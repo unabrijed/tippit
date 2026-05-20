@@ -137,8 +137,7 @@ export async function claimLatestPrivatePayment(wallet: Wallet | null, args: { r
 
     const scan = sdk.getClaimableUtxoScannerFunction({ client });
     const scanned = await scan(0 as any, 0 as any, 256 as any);
-    // SDK uses publicReceiver / receiver (not publicReceived / received)
-    const candidates = [...(scanned.publicReceiver ?? []), ...(scanned.receiver ?? [])];
+    const candidates = [...(scanned.publicReceived ?? []), ...(scanned.received ?? [])];
     const target = pickBestClaimCandidate(candidates, args.receiverAddress, args.amount);
     if (!target) {
       throw new Error("No matching private tip was found to claim yet.");

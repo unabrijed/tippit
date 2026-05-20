@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Copy, Check, DotsThree } from "@phosphor-icons/react/dist/ssr";
+import { Copy, Check, ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import type { PaymentLinkRecord } from "@/lib/types";
 import { StatusDot } from "@/components/brand-primitives";
 import { formatAmount } from "@/lib/format";
@@ -30,7 +30,6 @@ export function PaymentCard({
   activityAt?: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const relativeUrl = `/pay/${link.slug}`;
 
   const handleCopy = async () => {
@@ -38,16 +37,16 @@ export function PaymentCard({
       const fullUrl = `${window.location.origin}${relativeUrl}`;
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);
-      setTimeout(() => { setCopied(false); setMenuOpen(false); }, 1500);
+      setTimeout(() => setCopied(false), 1500);
     } catch {}
   };
 
   return (
-    <div className="group flex items-center gap-4 rounded-xl border border-border bg-white px-4 py-3 transition hover:shadow-card">
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 transition hover:shadow-card">
       {/* Status */}
       <StatusDot status={link.isExpired ? "expired" : link.status} />
 
-      {/* Amount */}
+      {/* Amount + label */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
           <span className="text-lg font-semibold tracking-tight text-foreground">
@@ -63,39 +62,31 @@ export function PaymentCard({
       </div>
 
       {/* Time */}
-      <span className="text-xs text-muted-foreground">
+      <span className="shrink-0 text-xs text-muted-foreground">
         {activityAt ? timeAgo(activityAt) : ""}
       </span>
 
-      {/* Actions menu */}
-      <div className="relative">
+      {/* Always-visible actions */}
+      <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-muted"
-          aria-label="Actions"
+          onClick={handleCopy}
+          title={copied ? "Copied!" : "Copy link"}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          aria-label={copied ? "Copied!" : "Copy link"}
         >
-          <DotsThree className="h-5 w-5" weight="bold" />
+          {copied ? <Check className="h-4 w-4 text-accent" weight="bold" /> : <Copy className="h-4 w-4" />}
         </button>
-
-        {menuOpen ? (
-          <div className="absolute right-0 top-full z-50 mt-1 w-36 animate-scale-in rounded-xl border border-border bg-white p-1 shadow-soft">
-            <Link
-              href={relativeUrl}
-              className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-foreground hover:bg-muted"
-            >
-              Open
-            </Link>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground hover:bg-muted"
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copied" : "Copy link"}
-            </button>
-          </div>
-        ) : null}
+        <Link
+          href={relativeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open link"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          aria-label="Open link"
+        >
+          <ArrowSquareOut className="h-4 w-4" />
+        </Link>
       </div>
     </div>
   );

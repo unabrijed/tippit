@@ -31,6 +31,35 @@ enum WithdrawalStatus {
   failed
 }
 
+enum LinkStatus {
+  draft
+  active
+  paid
+  expired
+  cancelled
+}
+
+enum PaymentStatus {
+  created
+  awaiting_signature
+  submitted
+  confirmed
+  claimable
+  claimed
+  failed
+  expired
+}
+
+enum PrivacyMode {
+  umbra_utxo
+  public_transfer
+}
+
+enum LinkType {
+  one_time
+  reusable
+}
+
 model CreatorProfile {
   id            String       @id @default(cuid())
   walletAddress String       @unique
@@ -86,4 +115,90 @@ model Withdrawal {
   creator         CreatorProfile   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
 
   @@index([creatorId, createdAt(sort: Desc)])
+}
+
+model Merchant {
+  id            String        @id @default(uuid())
+  walletAddress String
+  displayName   String
+  network       String        @default("devnet")
+  createdAt     DateTime      @default(now())
+  paymentLinks  PaymentLink[]
+
+  @@unique([walletAddress, network])
+}
+
+model PaymentLink {
+  id             String        @id @default(uuid())
+  merchantId     String
+  receiverWallet String
+  displayName    String
+  slug           String        @unique
+  title          String
+  description    String?
+  amount         Float
+  tokenType      String        @default("USDC")
+  tokenMint      String?
+  tokenSymbol    String        @default("USDC")
+  network        String        @default("devnet")
+  linkType       LinkType      @default(one_time)
+  privacyMode    PrivacyMode   @default(umbra_utxo)
+  status         LinkStatus    @default(active)
+  expiresAt      DateTime
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  merchant       Merchant      @relation(fields: [merchantId], references: [id])
+  intents        PaymentIntent[]
+
+  @@index([receiverWallet, network])
+}
+
+model PaymentIntent {
+  id                  String         @id @default(uuid())
+  paymentLinkId       String
+  linkTitle           String
+  receiverWallet      String
+  payerWallet         String?
+  amount              Float
+  tokenType           String         @default("USDC")
+  tokenMint           String?
+  tokenSymbol         String         @default("USDC")
+  network             String         @default("devnet")
+  status              PaymentStatus  @default(awaiting_signature)
+  solanaSignature     String?
+  claimSignature      String?
+  umbraUtxoCommitment String?
+  expiresAt           DateTime
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  link                PaymentLink    @relation(fields: [paymentLinkId], references: [id])
+  receipt             Receipt?
+  events              PaymentEvent[]
+
+  @@index([receiverWallet, network])
+}
+
+model Receipt {
+  id              String        @id @default(uuid())
+  paymentIntentId String        @unique
+  receiptCode     String        @unique
+  status          String        @default("issued")
+  intentStatus    PaymentStatus
+  amount          Float
+  tokenSymbol     String
+  network         String        @default("devnet")
+  displayName     String
+  createdAt       DateTime      @default(now())
+  intent          PaymentIntent @relation(fields: [paymentIntentId], references: [id])
+}
+
+model PaymentEvent {
+  id              String        @id @default(uuid())
+  paymentIntentId String
+  eventType       String
+  eventPayload    Json?
+  createdAt       DateTime      @default(now())
+  intent          PaymentIntent @relation(fields: [paymentIntentId], references: [id])
+
+  @@index([paymentIntentId])
 }

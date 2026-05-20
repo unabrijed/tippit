@@ -20,8 +20,8 @@ const NETWORK_CONFIG = {
     cluster: "devnet" as Cluster,
     umbraNetwork: "devnet" as const,
     defaultRpcUrl: "https://api.devnet.solana.com",
-    defaultUmbraIndexerApiEndpoint: "https://utxo-indexer.api.umbraprivacy.com",
-    defaultUmbraRelayerApiEndpoint: "https://relayer.api.umbraprivacy.com"
+    defaultUmbraIndexerApiEndpoint: "https://utxo-indexer.api-devnet.umbraprivacy.com",
+    defaultUmbraRelayerApiEndpoint: "https://relayer.api-devnet.umbraprivacy.com"
   }
 } as const;
 
@@ -51,10 +51,12 @@ export function getAppNetworkConfig(network: AppNetwork) {
       base.defaultRpcUrl,
     umbraIndexerApiEndpoint:
       process.env[`NEXT_PUBLIC_UMBRA_INDEXER_API_ENDPOINT_${suffix}`] ||
+      (network === "devnet" ? process.env.NEXT_PUBLIC_UMBRA_INDEXER_API_ENDPOINT_TESTNET : undefined) ||
       (network === "mainnet" ? process.env.NEXT_PUBLIC_UMBRA_INDEXER_API_ENDPOINT : undefined) ||
       base.defaultUmbraIndexerApiEndpoint,
     umbraRelayerApiEndpoint:
       process.env[`NEXT_PUBLIC_UMBRA_RELAYER_API_ENDPOINT_${suffix}`] ||
+      (network === "devnet" ? process.env.NEXT_PUBLIC_UMBRA_RELAYER_API_ENDPOINT_TESTNET : undefined) ||
       (network === "mainnet" ? process.env.NEXT_PUBLIC_UMBRA_RELAYER_API_ENDPOINT : undefined) ||
       base.defaultUmbraRelayerApiEndpoint
   };

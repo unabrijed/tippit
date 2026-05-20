@@ -4,10 +4,27 @@ import { tmpdir } from "os";
 import path from "path";
 import type { SupportedToken } from "@/lib/solana/tokens";
 import { slugify } from "@/lib/format";
-import { appEnv } from "@/lib/env";
+import { appEnv, getPostgresUrl } from "@/lib/env";
 import { DEFAULT_APP_NETWORK, type AppNetwork } from "@/lib/network";
 import { getValkeyClient } from "@/lib/valkey/client";
 import type { DashboardPayload, LinkStatus, MerchantRecord, PaymentIntentRecord, PaymentLinkRecord, ReceiptRecord } from "@/lib/types";
+
+// ---------------------------------------------------------------------------
+// Persistence tier helpers
+// ---------------------------------------------------------------------------
+
+function isPrismaAvailable() {
+  return Boolean(getPostgresUrl());
+}
+
+function getPrisma() {
+  const { getPrismaClient } = require("@/lib/db/prisma") as typeof import("@/lib/db/prisma");
+  return getPrismaClient();
+}
+
+// ---------------------------------------------------------------------------
+// In-memory / file store (dev fallback)
+// ---------------------------------------------------------------------------
 
 type EventRecord = {
   id: string;
@@ -64,19 +81,19 @@ const keys = {
   paymentEvents: "tippit:payment-events"
 } as const;
 
-function normalizeMerchantRecord(merchant: MerchantRecord | (Omit<MerchantRecord, "network"> & { network?: AppNetwork })) : MerchantRecord {
+function normalizeMerchantRecord(merchant: MerchantRecord | (Omit<MerchantRecord, "network"> & { network?: AppNetwork })): MerchantRecord {
   return { ...merchant, network: merchant.network ?? DEFAULT_APP_NETWORK };
 }
 
-function normalizePaymentLinkRecord(link: PaymentLinkRecord | (Omit<PaymentLinkRecord, "network"> & { network?: AppNetwork })) : PaymentLinkRecord {
+function normalizePaymentLinkRecord(link: PaymentLinkRecord | (Omit<PaymentLinkRecord, "network"> & { network?: AppNetwork })): PaymentLinkRecord {
   return { ...link, network: link.network ?? DEFAULT_APP_NETWORK, tokenType: (link as PaymentLinkRecord).tokenType ?? (((link as PaymentLinkRecord).tokenSymbol as SupportedToken) || "USDC") };
 }
 
-function normalizePaymentIntentRecord(intent: PaymentIntentRecord | (Omit<PaymentIntentRecord, "network"> & { network?: AppNetwork })) : PaymentIntentRecord {
+function normalizePaymentIntentRecord(intent: PaymentIntentRecord | (Omit<PaymentIntentRecord, "network"> & { network?: AppNetwork })): PaymentIntentRecord {
   return { ...intent, network: intent.network ?? DEFAULT_APP_NETWORK, tokenType: (intent as PaymentIntentRecord).tokenType ?? (((intent as PaymentIntentRecord).tokenSymbol as SupportedToken) || "USDC") };
 }
 
-function normalizeReceiptRecord(receipt: ReceiptRecord | (Omit<ReceiptRecord, "network"> & { network?: AppNetwork })) : ReceiptRecord {
+function normalizeReceiptRecord(receipt: ReceiptRecord | (Omit<ReceiptRecord, "network"> & { network?: AppNetwork })): ReceiptRecord {
   return { ...receipt, network: receipt.network ?? DEFAULT_APP_NETWORK };
 }
 
@@ -116,6 +133,10 @@ async function persistMemory() {
 async function ensureMemoryLoaded() {
   if (getValkeyClient() || memoryLoaded) return;
 
+  if (process.env.VERCEL && !isPrismaAvailable() && !getValkeyClient()) {
+    console.error("[tippit] WARNING: Running on Vercel without Postgres or Valkey. Payment links will not persist across requests. Set DATABASE_URL or VALKEY_URL.");
+  }
+
   try {
     const raw = await readFile(localStorePath, "utf8");
     hydrateMemory(JSON.parse(raw) as LocalStoreSnapshot);
@@ -136,6 +157,10 @@ function enrichLink(link: PaymentLinkRecord): PaymentLinkRecord {
   const nextStatus: LinkStatus = isExpired && link.status === "active" ? "expired" : link.status;
   return { ...link, status: nextStatus, isExpired };
 }
+
+// ---------------------------------------------------------------------------
+// Valkey helpers
+// ---------------------------------------------------------------------------
 
 async function getJsonValue<T>(key: string) {
   const valkey = getValkeyClient();
@@ -162,7 +187,93 @@ async function appendIndexedId(key: string, id: string) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Prisma record mappers
+// ---------------------------------------------------------------------------
+
+function prismaLinkToRecord(row: {
+  id: string; merchantId: string; receiverWallet: string; displayName: string; slug: string; title: string; description: string | null;
+  amount: number; tokenType: string; tokenMint: string | null; tokenSymbol: string; network: string; linkType: string;
+  privacyMode: string; status: string; expiresAt: Date; createdAt: Date; updatedAt: Date;
+}): PaymentLinkRecord {
+  return enrichLink({
+    id: row.id,
+    merchantId: row.merchantId,
+    receiverWallet: row.receiverWallet,
+    displayName: row.displayName,
+    slug: row.slug,
+    title: row.title,
+    description: row.description ?? undefined,
+    amount: row.amount,
+    tokenType: row.tokenType as SupportedToken,
+    tokenMint: row.tokenMint ?? undefined,
+    tokenSymbol: row.tokenSymbol,
+    network: row.network as AppNetwork,
+    linkType: row.linkType as "one_time" | "reusable",
+    privacyMode: row.privacyMode as "umbra_utxo" | "public_transfer",
+    status: row.status as LinkStatus,
+    expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  });
+}
+
+function prismaIntentToRecord(row: {
+  id: string; paymentLinkId: string; linkTitle: string; receiverWallet: string; payerWallet: string | null;
+  amount: number; tokenType: string; tokenMint: string | null; tokenSymbol: string; network: string;
+  status: string; solanaSignature: string | null; claimSignature: string | null; umbraUtxoCommitment: string | null;
+  expiresAt: Date; createdAt: Date; updatedAt: Date;
+}): PaymentIntentRecord {
+  return {
+    id: row.id,
+    paymentLinkId: row.paymentLinkId,
+    linkTitle: row.linkTitle,
+    receiverWallet: row.receiverWallet,
+    payerWallet: row.payerWallet ?? undefined,
+    amount: row.amount,
+    tokenType: row.tokenType as SupportedToken,
+    tokenMint: row.tokenMint ?? undefined,
+    tokenSymbol: row.tokenSymbol,
+    network: row.network as AppNetwork,
+    status: row.status as PaymentIntentRecord["status"],
+    solanaSignature: row.solanaSignature ?? undefined,
+    claimSignature: row.claimSignature ?? undefined,
+    umbraUtxoCommitment: row.umbraUtxoCommitment ?? undefined,
+    expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  };
+}
+
+function prismaReceiptToRecord(row: {
+  id: string; paymentIntentId: string; receiptCode: string; status: string; intentStatus: string;
+  amount: number; tokenSymbol: string; network: string; displayName: string; createdAt: Date;
+}): ReceiptRecord {
+  return {
+    id: row.id,
+    paymentIntentId: row.paymentIntentId,
+    receiptCode: row.receiptCode,
+    status: row.status as "issued",
+    intentStatus: row.intentStatus as ReceiptRecord["intentStatus"],
+    amount: row.amount,
+    tokenSymbol: row.tokenSymbol,
+    network: row.network as AppNetwork,
+    displayName: row.displayName,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Event logging (shared across tiers)
+// ---------------------------------------------------------------------------
+
 async function logEvent(paymentIntentId: string, eventType: string, eventPayload?: Record<string, unknown>) {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    await db.paymentEvent.create({ data: { paymentIntentId, eventType, eventPayload: (eventPayload ?? undefined) as object | undefined } });
+    return;
+  }
+
   await ensureMemoryLoaded();
   const event = { id: randomUUID(), paymentIntentId, eventType, eventPayload, createdAt: now() };
   paymentEvents.push(event);
@@ -176,7 +287,21 @@ async function logEvent(paymentIntentId: string, eventType: string, eventPayload
   await setJsonValue(keys.paymentEvents, events);
 }
 
-export async function upsertMerchant(walletAddress: string, displayName?: string, network: AppNetwork = DEFAULT_APP_NETWORK) {
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+export async function upsertMerchant(walletAddress: string, displayName?: string, network: AppNetwork = DEFAULT_APP_NETWORK): Promise<MerchantRecord> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const row = await db.merchant.upsert({
+      where: { walletAddress_network: { walletAddress, network } },
+      update: { displayName: displayName || undefined },
+      create: { walletAddress, displayName: displayName || "Tippit creator", network }
+    });
+    return { id: row.id, walletAddress: row.walletAddress, displayName: row.displayName, network: row.network as AppNetwork, createdAt: row.createdAt.toISOString() };
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -201,7 +326,35 @@ export async function upsertMerchant(walletAddress: string, displayName?: string
   return merchant;
 }
 
-export async function createPaymentLink(input: PaymentLinkInsert) {
+export async function createPaymentLink(input: PaymentLinkInsert): Promise<PaymentLinkRecord> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const merchant = await upsertMerchant(input.receiverWallet, input.displayName, input.network);
+    const id = randomUUID();
+    const slug = `${slugify(input.title)}-${id.slice(0, 6)}`;
+    const row = await db.paymentLink.create({
+      data: {
+        id,
+        merchantId: merchant.id,
+        receiverWallet: input.receiverWallet,
+        displayName: input.displayName || merchant.displayName,
+        slug,
+        title: input.title,
+        description: input.description,
+        amount: input.amount,
+        tokenType: input.tokenType,
+        tokenMint: input.tokenMint,
+        tokenSymbol: input.tokenType,
+        network: input.network,
+        linkType: input.linkType,
+        privacyMode: input.privacyMode ?? (input.tokenType === "USDC" ? "umbra_utxo" : "public_transfer"),
+        status: "active",
+        expiresAt: new Date(input.expiresAt)
+      }
+    });
+    return prismaLinkToRecord(row);
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -260,7 +413,16 @@ export async function createPaymentLink(input: PaymentLinkInsert) {
   return link;
 }
 
-export async function listPaymentLinksByWallet(walletAddress: string, network: AppNetwork = DEFAULT_APP_NETWORK) {
+export async function listPaymentLinksByWallet(walletAddress: string, network: AppNetwork = DEFAULT_APP_NETWORK): Promise<PaymentLinkRecord[]> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const rows = await db.paymentLink.findMany({
+      where: { receiverWallet: walletAddress, network },
+      orderBy: { createdAt: "desc" }
+    });
+    return rows.map(prismaLinkToRecord);
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -278,7 +440,13 @@ export async function listPaymentLinksByWallet(walletAddress: string, network: A
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function getPaymentLinkBySlug(slug: string) {
+export async function getPaymentLinkBySlug(slug: string): Promise<PaymentLinkRecord | null> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const row = await db.paymentLink.findUnique({ where: { slug } });
+    return row ? prismaLinkToRecord(row) : null;
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -292,7 +460,13 @@ export async function getPaymentLinkBySlug(slug: string) {
   return link ? enrichLink(link) : null;
 }
 
-export async function getPaymentLinkById(id: string) {
+export async function getPaymentLinkById(id: string): Promise<PaymentLinkRecord | null> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const row = await db.paymentLink.findUnique({ where: { id } });
+    return row ? prismaLinkToRecord(row) : null;
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -304,14 +478,37 @@ export async function getPaymentLinkById(id: string) {
   return link ? enrichLink(link) : null;
 }
 
-export async function createPaymentIntent(input: { paymentLinkId: string; payerWallet?: string; amount: number; tokenMint?: string; tokenType?: SupportedToken; network: AppNetwork }) {
-  await ensureMemoryLoaded();
+export async function createPaymentIntent(input: { paymentLinkId: string; payerWallet?: string; amount: number; tokenMint?: string; tokenType?: SupportedToken; network: AppNetwork }): Promise<PaymentIntentRecord> {
   const link = await getPaymentLinkById(input.paymentLinkId);
   if (!link) throw new Error("Tip link not found.");
   if (link.network !== input.network) throw new Error(`This tip link belongs to ${link.network}, but ${input.network} is selected.`);
   if (link.status !== "active") throw new Error("This tip link is not active.");
   if (link.isExpired) throw new Error("This tip link has expired.");
 
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    const row = await db.paymentIntent.create({
+      data: {
+        paymentLinkId: link.id,
+        linkTitle: link.title,
+        receiverWallet: link.receiverWallet,
+        payerWallet: input.payerWallet,
+        amount: input.amount,
+        tokenType: link.tokenType,
+        tokenMint: link.tokenMint,
+        tokenSymbol: link.tokenSymbol,
+        network: input.network,
+        status: "awaiting_signature",
+        expiresAt
+      }
+    });
+    const intent = prismaIntentToRecord(row);
+    await logEvent(row.id, "payment_intent.created");
+    return intent;
+  }
+
+  await ensureMemoryLoaded();
   const valkey = getValkeyClient();
   const id = randomUUID();
   if (!valkey) {
@@ -359,7 +556,13 @@ export async function createPaymentIntent(input: { paymentLinkId: string; payerW
   return intent;
 }
 
-export async function getPaymentIntentById(id: string) {
+export async function getPaymentIntentById(id: string): Promise<PaymentIntentRecord | null> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const row = await db.paymentIntent.findUnique({ where: { id } });
+    return row ? prismaIntentToRecord(row) : null;
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -368,7 +571,25 @@ export async function getPaymentIntentById(id: string) {
   return await getJsonValue<PaymentIntentRecord>(keys.paymentIntent(id));
 }
 
-export async function updatePaymentIntent(id: string, patch: Partial<PaymentIntentRecord>) {
+export async function updatePaymentIntent(id: string, patch: Partial<PaymentIntentRecord>): Promise<PaymentIntentRecord | null> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    try {
+      const row = await db.paymentIntent.update({
+        where: { id },
+        data: {
+          status: patch.status,
+          solanaSignature: patch.solanaSignature,
+          claimSignature: patch.claimSignature,
+          umbraUtxoCommitment: patch.umbraUtxoCommitment
+        }
+      });
+      return prismaIntentToRecord(row);
+    } catch {
+      return null;
+    }
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -397,18 +618,26 @@ export async function markIntentClaimable(id: string, signature: string, umbraUt
   const intent = await updatePaymentIntent(id, { status: "claimable", solanaSignature: signature, umbraUtxoCommitment });
   if (!intent) return null;
 
-  const valkey = getValkeyClient();
-  if (!valkey) {
-    await ensureMemoryLoaded();
-    const link = paymentLinks.get(intent.paymentLinkId);
-    if (link && link.linkType === "one_time") {
-      paymentLinks.set(link.id, { ...link, status: "paid", updatedAt: now() });
-      await persistMemory();
-    }
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    await db.paymentLink.updateMany({
+      where: { id: intent.paymentLinkId, linkType: "one_time" },
+      data: { status: "paid" }
+    });
   } else {
-    const link = await getJsonValue<PaymentLinkRecord>(keys.paymentLink(intent.paymentLinkId));
-    if (link && link.linkType === "one_time") {
-      await setJsonValue(keys.paymentLink(link.id), { ...link, status: "paid", updatedAt: now() });
+    const valkey = getValkeyClient();
+    if (!valkey) {
+      await ensureMemoryLoaded();
+      const link = paymentLinks.get(intent.paymentLinkId);
+      if (link && link.linkType === "one_time") {
+        paymentLinks.set(link.id, { ...link, status: "paid", updatedAt: now() });
+        await persistMemory();
+      }
+    } else {
+      const link = await getJsonValue<PaymentLinkRecord>(keys.paymentLink(intent.paymentLinkId));
+      if (link && link.linkType === "one_time") {
+        await setJsonValue(keys.paymentLink(link.id), { ...link, status: "paid", updatedAt: now() });
+      }
     }
   }
 
@@ -422,13 +651,32 @@ export async function markIntentFailed(id: string, errorMessage: string) {
   return intent;
 }
 
-export async function issueReceiptForIntent(id: string) {
-  await ensureMemoryLoaded();
+export async function issueReceiptForIntent(id: string): Promise<ReceiptRecord> {
   const existing = await findReceiptByPaymentIntentId(id);
   if (existing) return existing;
+
   const intent = await getPaymentIntentById(id);
   if (!intent) throw new Error("Payment intent not found.");
   const link = await getPaymentLinkById(intent.paymentLinkId);
+
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const receiptCode = `gp-${id.slice(0, 6)}`;
+    const row = await db.receipt.create({
+      data: {
+        paymentIntentId: id,
+        receiptCode,
+        status: "issued",
+        intentStatus: intent.status,
+        amount: intent.amount,
+        tokenSymbol: intent.tokenSymbol,
+        network: intent.network,
+        displayName: link?.displayName ?? "Tippit creator"
+      }
+    });
+    return prismaReceiptToRecord(row);
+  }
+
   const receipt: ReceiptRecord = {
     id: randomUUID(),
     paymentIntentId: id,
@@ -444,6 +692,7 @@ export async function issueReceiptForIntent(id: string) {
 
   const valkey = getValkeyClient();
   if (!valkey) {
+    await ensureMemoryLoaded();
     receipts.set(receipt.receiptCode, receipt);
     await persistMemory();
     return receipt;
@@ -454,7 +703,13 @@ export async function issueReceiptForIntent(id: string) {
   return receipt;
 }
 
-async function findReceiptByPaymentIntentId(paymentIntentId: string) {
+async function findReceiptByPaymentIntentId(paymentIntentId: string): Promise<ReceiptRecord | null> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const row = await db.receipt.findUnique({ where: { paymentIntentId } });
+    return row ? prismaReceiptToRecord(row) : null;
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -481,7 +736,13 @@ export async function claimIntent(id: string, claimSignatureOverride?: string) {
   return { intent: claimed, receipt };
 }
 
-export async function getReceiptByCode(code: string) {
+export async function getReceiptByCode(code: string): Promise<ReceiptRecord | null> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const row = await db.receipt.findUnique({ where: { receiptCode: code } });
+    return row ? prismaReceiptToRecord(row) : null;
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -491,6 +752,18 @@ export async function getReceiptByCode(code: string) {
 }
 
 export async function getDashboard(walletAddress: string, network: AppNetwork = DEFAULT_APP_NETWORK): Promise<DashboardPayload> {
+  if (isPrismaAvailable()) {
+    const db = getPrisma();
+    const [links, intents] = await Promise.all([
+      db.paymentLink.findMany({ where: { receiverWallet: walletAddress, network }, orderBy: { createdAt: "desc" } }),
+      db.paymentIntent.findMany({ where: { receiverWallet: walletAddress, network }, orderBy: { createdAt: "desc" } })
+    ]);
+    return {
+      links: links.map(prismaLinkToRecord),
+      intents: intents.map(prismaIntentToRecord)
+    };
+  }
+
   const valkey = getValkeyClient();
   if (!valkey) {
     await ensureMemoryLoaded();
@@ -514,5 +787,6 @@ export async function getDashboard(walletAddress: string, network: AppNetwork = 
 }
 
 export function getPersistenceMode() {
+  if (isPrismaAvailable()) return "postgres";
   return appEnv.isValkeyConfigured ? "valkey" : "memory";
 }

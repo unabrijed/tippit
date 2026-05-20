@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CheckCircle, Lock, LockOpen, WarningCircle } from "@phosphor-icons/react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction, type VersionedTransaction } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
@@ -11,13 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SolanaPayQr } from "@/components/solana-pay-qr";
 import { useNetwork } from "@/components/network-provider";
+import { usePaymentRail } from "@/components/payment-rail-provider";
 import { StatusDot } from "@/components/brand-primitives";
 import { formatAmount } from "@/lib/format";
 import { createPrivatePayment } from "@/lib/umbra/browser";
 import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
 import { withNetworkHeaders } from "@/lib/network-request";
+import { deserializeMagicBlockTransaction, resolveMagicBlockRpc } from "@/lib/magicblock/tx";
 
-type State = { loading: boolean; step?: string; error?: string; success?: boolean; mode?: "public" | "private" };
+type State = { loading: boolean; step?: string; error?: string; success?: boolean; mode?: "magicblock" | "umbra" | "public" };
 
 const SOL_FEE_BUFFER = 0.00001;
 
@@ -27,13 +29,12 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const { setVisible } = useWalletModal();
   const [state, setState] = useState<State>({ loading: false });
   const { config, network } = useNetwork();
+  const { rail } = usePaymentRail();
 
   const networkMatches = link.network === network;
   const canPay = useMemo(() => link.status === "active" && !link.isExpired && networkMatches, [link.isExpired, link.status, networkMatches]);
   const umbraSupport = useMemo(() => getUmbraWalletSupport(wallet), [wallet]);
   const canPayPrivately = canPay && link.tokenType === "USDC" && connected && umbraSupport.supported;
-  const prefersPrivatePayments = link.tokenType === "USDC" && link.privacyMode === "umbra_utxo";
-  const isPrivate = prefersPrivatePayments && canPayPrivately;
 
   const ensureSufficientBalance = async () => {
     if (!publicKey) throw new Error("Connect wallet.");
@@ -58,29 +59,78 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
     if (lamports / 1_000_000_000 < SOL_FEE_BUFFER) throw new Error("Need SOL for fees.");
   };
 
+  const payMagicBlock = async () => {
+    if (!publicKey || !signTransaction) {
+      if (!connected) setVisible(true);
+      return;
+    }
+    try {
+      await ensureSufficientBalance();
+      setState({ loading: true, step: "Creating…", mode: "magicblock" });
+      const intentResponse = await fetch("/api/payment-intents", withNetworkHeaders({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentLinkId: link.id, payerWallet: publicKey.toBase58(), amount: String(link.amount), tokenType: link.tokenType, tokenMint: link.tokenMint })
+      }, network));
+      const intentData = await intentResponse.json();
+      if (!intentResponse.ok) throw new Error(intentData.error ?? "Intent failed.");
+
+      setState({ loading: true, step: "Building…", mode: "magicblock" });
+      const txResponse = await fetch(`/api/payment-intents/${intentData.id}/build-magicblock-transfer`, withNetworkHeaders({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payerWallet: publicKey.toBase58() })
+      }, network));
+      const txData = await txResponse.json();
+      if (!txResponse.ok) throw new Error(txData.error ?? "Build failed.");
+
+      const unsignedTx = deserializeMagicBlockTransaction(txData.transactionBase64) as Transaction | VersionedTransaction;
+      const signedTx = await signTransaction(unsignedTx);
+      setState({ loading: true, step: "Sending…", mode: "magicblock" });
+      const rpcUrl = txData.rpcUrl ?? resolveMagicBlockRpc(txData, network);
+      const mbConnection = new Connection(rpcUrl, "confirmed");
+      const signature = await mbConnection.sendRawTransaction(signedTx.serialize());
+      const latestBlockhash = await mbConnection.getLatestBlockhash();
+      await mbConnection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
+
+      setState({ loading: true, step: "Confirming…", mode: "magicblock" });
+      const confirmResponse = await fetch(`/api/payment-intents/${intentData.id}/confirm`, withNetworkHeaders({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signature })
+      }, network));
+      const confirmData = await confirmResponse.json();
+      if (!confirmResponse.ok) throw new Error(confirmData.error ?? "Confirm failed.");
+      setState({ loading: false, success: true, mode: "magicblock" });
+      window.location.href = `/receipt/${confirmData.receipt.receiptCode}`;
+    } catch (error) {
+      setState({ loading: false, error: error instanceof Error ? error.message : "Payment failed.", mode: "magicblock" });
+    }
+  };
+
   const payPrivately = async () => {
     if (!connected) { setVisible(true); return; }
     if (!umbraSupport.supported) { setState({ loading: false, error: "Use a compatible wallet." }); return; }
     try {
       await ensureSufficientBalance();
-      setState({ loading: true, step: "Creating intent…", mode: "private" });
+      setState({ loading: true, step: "Creating intent…", mode: "umbra" });
       const intentResponse = await fetch("/api/payment-intents", withNetworkHeaders({
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paymentLinkId: link.id, payerWallet: publicKey?.toBase58(), amount: String(link.amount), tokenType: link.tokenType, tokenMint: link.tokenMint })
       }, network));
       const intentData = await intentResponse.json();
       if (!intentResponse.ok) throw new Error(intentData.error ?? "Intent failed.");
-      const privateResult = await createPrivatePayment(wallet, { network, receiverAddress: link.receiverWallet, mint: link.tokenMint ?? "", amount: link.amount }, (step) => setState({ loading: true, step, mode: "private" }));
+      const privateResult = await createPrivatePayment(wallet, { network, receiverAddress: link.receiverWallet, mint: link.tokenMint ?? "", amount: link.amount }, (step) => setState({ loading: true, step, mode: "umbra" }));
       const signature = privateResult.createUtxoSignature as string | undefined;
       if (!signature) throw new Error("No signature returned.");
-      setState({ loading: true, step: "Confirming…", mode: "private" });
+      setState({ loading: true, step: "Confirming…", mode: "umbra" });
       const confirmResponse = await fetch(`/api/payment-intents/${intentData.id}/confirm`, withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature, umbraUtxoCommitment: signature }) }, network));
       const confirmData = await confirmResponse.json();
       if (!confirmResponse.ok) throw new Error(confirmData.error ?? "Confirm failed.");
-      setState({ loading: false, success: true, mode: "private" });
+      setState({ loading: false, success: true, mode: "umbra" });
       window.location.href = `/receipt/${confirmData.receipt.receiptCode}`;
     } catch (error) {
-      setState({ loading: false, error: error instanceof Error ? error.message : "Payment failed.", mode: "private" });
+      setState({ loading: false, error: error instanceof Error ? error.message : "Payment failed.", mode: "umbra" });
     }
   };
 
@@ -117,6 +167,14 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
     }
   };
 
+  const handlePay = () => {
+    if (rail === "magicblock") return payMagicBlock();
+    if (rail === "umbra" && canPayPrivately) return payPrivately();
+    return pay();
+  };
+
+  const isPrivate = rail === "magicblock" || (rail === "umbra" && canPayPrivately);
+
   // Success state
   if (state.success) {
     return (
@@ -149,8 +207,8 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
 
         {/* Privacy indicator */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {prefersPrivatePayments ? <Lock className="h-3.5 w-3.5 text-accent" /> : <LockOpen className="h-3.5 w-3.5" />}
-          {prefersPrivatePayments ? "Private" : "Public"}
+          {isPrivate ? <Lock className="h-3.5 w-3.5 text-accent" /> : <LockOpen className="h-3.5 w-3.5" />}
+          {isPrivate ? "Private" : "Public"}
         </div>
 
         {/* Error */}
@@ -172,8 +230,8 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
         {/* CTA */}
         {!state.success && !state.loading ? (
           <Button
-            onClick={!connected ? () => setVisible(true) : isPrivate ? payPrivately : pay}
-            disabled={!canPay}
+            onClick={!connected ? () => setVisible(true) : handlePay}
+            disabled={!canPay || (rail === "umbra" && connected && !umbraSupport.supported)}
             className="w-full max-w-xs"
             size="lg"
           >
@@ -185,8 +243,8 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
           </Button>
         ) : null}
 
-        {/* QR toggle */}
-        {!prefersPrivatePayments && !state.loading ? <SolanaPayQr slug={link.slug} /> : null}
+        {/* QR toggle — only for public rail */}
+        {rail !== "magicblock" && !isPrivate && !state.loading ? <SolanaPayQr slug={link.slug} /> : null}
       </CardContent>
     </Card>
   );
