@@ -10,7 +10,8 @@ import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
 export function UmbraReadinessCard() {
   const { wallet, connected } = useWallet();
   const support = getUmbraWalletSupport(wallet);
-  const { config } = useNetwork();
+  const { config, network } = useNetwork();
+  const isMainnet = network === "mainnet";
 
   return (
     <Card>
@@ -25,18 +26,20 @@ export function UmbraReadinessCard() {
           </div>
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">
-          {!connected
-            ? "Connect a compatible wallet to register and use private tipping."
-            : support.supported
-              ? `Ready with ${support.walletName ?? "your wallet"}.`
-              : support.reason}
+          {!isMainnet
+            ? "Umbra private payments are only available on mainnet. Switch network to register."
+            : !connected
+              ? "Connect a compatible wallet to register and use private tipping."
+              : support.supported
+                ? `Ready with ${support.walletName ?? "your wallet"}.`
+                : support.reason}
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           <ReadinessTile label="Network" value={config.label} />
           <ReadinessTile label="Indexer" value="Configured" />
           <ReadinessTile label="Relayer" value="Configured" />
         </div>
-        <UmbraRegisterButton />
+        {isMainnet && <UmbraRegisterButton />}
       </CardContent>
     </Card>
   );

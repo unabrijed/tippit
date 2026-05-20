@@ -13,12 +13,19 @@ export async function POST(request: Request) {
   }
 
   const network = getNetworkFromRequest(request);
-  const result = await loginToMagicBlock({
-    pubkey: parsed.data.walletAddress,
-    challenge: parsed.data.challenge,
-    signature: parsed.data.signature,
-    network
-  });
+  let result: { token: string };
+  try {
+    result = await loginToMagicBlock({
+      pubkey: parsed.data.walletAddress,
+      challenge: parsed.data.challenge,
+      signature: parsed.data.signature,
+      network
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[magicblock/login]", message);
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   const creator = await getCreatorByWallet(parsed.data.walletAddress);
   persistCreatorSession({ walletAddress: parsed.data.walletAddress, token: result.token, slug: creator?.slug });

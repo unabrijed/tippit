@@ -1,8 +1,8 @@
 import type { AppNetwork } from "@/lib/network";
 import { getMagicBlockApiBase, getMagicBlockCluster } from "@/lib/magicblock/constants";
 
-export async function magicBlockFetch<T>(path: string, options?: RequestInit & { network?: AppNetwork; token?: string }) {
-  const base = getMagicBlockApiBase();
+export async function magicBlockFetch<T>(path: string, options?: RequestInit & { network?: AppNetwork; token?: string; baseUrl?: string }) {
+  const base = options?.baseUrl ?? getMagicBlockApiBase();
   const url = `${base}${path}`;
   const headers = new Headers(options?.headers);
   headers.set("Content-Type", "application/json");

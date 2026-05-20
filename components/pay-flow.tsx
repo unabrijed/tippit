@@ -19,7 +19,7 @@ import { createPrivatePayment } from "@/lib/umbra/browser";
 import { getUmbraWalletSupport } from "@/lib/umbra/wallet";
 import { withNetworkHeaders } from "@/lib/network-request";
 import { deserializeMagicBlockTransaction, resolveMagicBlockRpc } from "@/lib/magicblock/tx";
-import { getDefaultUsdcMint } from "@/lib/solana/tokens";
+import { getUsdcMint } from "@/lib/tippit/constants";
 
 type State = { loading: boolean; step?: string; error?: string; success?: boolean; mode?: "magicblock" | "umbra" | "public" };
 type BalanceState = { value: number | null; loading: boolean };
@@ -46,12 +46,14 @@ function useWalletTokenBalance(tokenType: "USDC" | "SOL" | string, tokenMint: st
           const lamports = await connection.getBalance(publicKey, "confirmed");
           if (!cancelled) setBalance({ value: lamports / 1_000_000_000, loading: false });
         } else {
-          const mintAddress = tokenMint ?? getDefaultUsdcMint(network as "mainnet" | "devnet");
+          const mintAddress = tokenMint ?? getUsdcMint(network as "mainnet" | "devnet");
           const mint = new PublicKey(mintAddress);
           const ata = getAssociatedTokenAddressSync(mint, publicKey);
           const accountInfo = await connection.getAccountInfo(ata, "confirmed");
           if (!accountInfo) {
-            if (!cancelled) setBalance({ value: 0, loading: false });
+            // No ATA exists — wallet has never held this token on this network.
+            // Return null (shown as "—") rather than 0 to avoid confusion with an actual zero balance.
+            if (!cancelled) setBalance({ value: null, loading: false });
             return;
           }
           const tokenBalance = await connection.getTokenAccountBalance(ata, "confirmed");
@@ -106,12 +108,12 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
     const mint = new PublicKey(link.tokenMint);
     const ata = getAssociatedTokenAddressSync(mint, publicKey);
     const accountInfo = await connection.getAccountInfo(ata, "confirmed");
-    if (!accountInfo) throw new Error(`No ${link.tokenSymbol} account.`);
+    if (!accountInfo) throw new Error(`No ${link.tokenSymbol} account found.`);
     const balance = await connection.getTokenAccountBalance(ata, "confirmed");
     const available = Number(balance.value.uiAmountString ?? balance.value.uiAmount ?? 0);
-    if (available < link.amount) throw new Error(`Need ${link.amount} ${link.tokenSymbol}`);
+    if (available < link.amount) throw new Error(`Need ${link.amount} ${link.tokenSymbol} (have ${available}).`);
     const lamports = await connection.getBalance(publicKey, "confirmed");
-    if (lamports / 1_000_000_000 < SOL_FEE_BUFFER) throw new Error("Need SOL for fees.");
+    if (lamports / 1_000_000_000 < SOL_FEE_BUFFER) throw new Error("Need a small amount of SOL for transaction fees.");
   };
 
   const payMagicBlock = async () => {
@@ -120,7 +122,6 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       return;
     }
     try {
-      await ensureSufficientBalance();
       setState({ loading: true, step: "Creating…", mode: "magicblock" });
       const intentResponse = await fetch("/api/payment-intents", withNetworkHeaders({
         method: "POST",
@@ -232,7 +233,6 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       return;
     }
     try {
-      await ensureSufficientBalance();
       setState({ loading: true, step: "Creating…", mode: "public" });
       const intentResponse = await fetch("/api/payment-intents", withNetworkHeaders({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentLinkId: link.id, payerWallet: publicKey.toBase58(), amount: String(link.amount), tokenType: link.tokenType, tokenMint: link.tokenMint }) }, network));
       const intentData = await intentResponse.json();
@@ -309,11 +309,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
             {walletBalance.loading ? (
               <span className="h-3 w-12 animate-pulse rounded bg-muted-foreground/20" />
             ) : walletBalance.value !== null ? (
-              <span
-                className={`font-semibold tabular-nums ${
-                  walletBalance.value < link.amount ? "text-destructive" : "text-foreground"
-                }`}
-              >
+              <span className="font-semibold tabular-nums text-foreground">
                 {walletBalance.value.toLocaleString(undefined, { maximumFractionDigits: link.tokenType === "SOL" ? 6 : 2 })}{" "}
                 <span className="font-normal text-muted-foreground">{link.tokenSymbol}</span>
               </span>
@@ -331,6 +327,11 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
           <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
             <WarningCircle className="h-4 w-4" aria-hidden />
             SOL payments are disabled. Please create and use USDC links only.
+          </div>
+        ) : rail === "umbra" && connected && !umbraSupport.supported ? (
+          <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+            <WarningCircle className="h-4 w-4" aria-hidden />
+            {umbraSupport.reason ?? "Your wallet does not support Umbra private payments. Try Phantom or Solflare."}
           </div>
         ) : state.error ? (
           <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">

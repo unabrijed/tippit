@@ -17,11 +17,13 @@ function toAtomicAmount(amount: number) {
 }
 
 function normalizeUmbraError(error: unknown) {
+  console.error("[umbra] raw error:", error);
   const message = error instanceof Error ? error.message : "Umbra operation failed.";
+  if (message.includes("has not been populated") || message.includes("build pipeline")) return "Umbra private payments are only available on mainnet. Switch to mainnet and try again.";
   if (message.includes("Wallet Standard")) return "Your wallet does not expose the signing features Umbra needs. Try Phantom or Solflare in browser mode.";
   if (message.includes("User rejected") || message.includes("declined") || message.includes("rejected")) return "The wallet request was cancelled.";
   if (message.includes("No matching private payment")) return message.replaceAll("private payment", "private tip");
-  if (message.includes("fetch") || message.includes("network")) return "Umbra network services were unreachable. Check RPC, indexer, or relayer configuration and try again.";
+  if (message.includes("Failed to fetch") || message.toLowerCase().includes("network error") || message.toLowerCase().includes("fetch error") || message.includes("ECONNREFUSED") || message.includes("ETIMEDOUT")) return "Umbra network services were unreachable. Check RPC, indexer, or relayer configuration and try again.";
   if (message.toLowerCase().includes("simulation") || message.toLowerCase().includes("simulate")) return "Transaction simulation failed. The recipient may not have a registered Umbra account, or there may be insufficient SOL for fees. Please try again.";
   return message;
 }
@@ -64,17 +66,67 @@ async function getClient(wallet: Wallet | null, network: AppNetwork) {
 }
 
 export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwork, onProgress?: ProgressCallback) {
+  const { isRegistrationError } = await import("@umbra-privacy/sdk/errors");
   try {
     onProgress?.("Preparing Umbra wallet registration…");
     const { sdk, prover, client } = await getClient(wallet, network);
+
+    // Check registration state first — skip register() entirely if already complete
+    // to avoid unnecessary wallet prompts and SOL costs.
+    const query = sdk.getUserAccountQuerierFunction({ client });
+    const accountState = await query(client.signer.address);
+    const isFullyRegistered =
+      accountState.state === "exists" &&
+      (accountState.data as any).isUserAccountX25519KeyRegistered &&
+      (accountState.data as any).isUserCommitmentRegistered;
+
+    if (isFullyRegistered) {
+      onProgress?.("Umbra wallet already registered.");
+      return [];
+    }
+
     const register = sdk.getUserRegistrationFunction(
       { client },
       { zkProver: prover.getUserRegistrationProver() }
     );
-    const result = await register({ confidential: true, anonymous: true });
-    onProgress?.("Umbra registration ready.");
-    return result;
+
+    const signatures = await register({
+      confidential: true,
+      anonymous: true,
+      callbacks: {
+        userAccountInitialisation: {
+          pre: async () => { onProgress?.("Creating Umbra account…"); },
+          post: async () => { onProgress?.("Account created."); }
+        },
+        registerX25519PublicKey: {
+          pre: async () => { onProgress?.("Registering encryption key…"); },
+          post: async () => { onProgress?.("Encryption key registered."); }
+        },
+        registerUserForAnonymousUsage: {
+          pre: async () => { onProgress?.("Generating registration proof…"); },
+          post: async () => { onProgress?.("Registration complete."); }
+        }
+      } as any
+    });
+
+    return signatures;
   } catch (error) {
+    if (isRegistrationError(error)) {
+      switch (error.stage) {
+        case "master-seed-derivation":
+          throw new Error("Please sign the master seed message to set up your Umbra account.");
+        case "transaction-sign":
+          throw new Error("Registration cancelled — wallet request was rejected.");
+        case "zk-proof-generation":
+          throw new Error("Failed to generate registration proof. Please try again.");
+        case "account-fetch":
+          throw new Error("Could not read Umbra account state. Check your RPC connection and try again.");
+        case "transaction-send":
+          throw new Error("Transaction timed out. The registration may have landed — check the dashboard before retrying.");
+        default:
+          throw new Error(`Registration failed at stage "${error.stage}": ${error.message}`);
+      }
+    }
     throw new Error(normalizeUmbraError(error));
   }
 }

@@ -32,10 +32,9 @@ export async function createMagicBlockTipTx(input: {
       initIfMissing: true,
       initAtasIfMissing: true,
       initVaultIfMissing: true,
-      memo: `Tippit:${input.clientRefId}`,
       clientRefId: toNumericRefId(input.clientRefId),
       split: 1,
-      gasless: true,
+      gasless: false,
       minDelayMs: "0",
       maxDelayMs: "0"
     }))

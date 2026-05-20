@@ -16,6 +16,8 @@ export function UmbraRegisterButton() {
   const support = getUmbraWalletSupport(wallet);
   const { network } = useNetwork();
 
+  const isMainnet = network === "mainnet";
+
   const register = async () => {
     if (!connected) {
       setVisible(true);
@@ -38,10 +40,11 @@ export function UmbraRegisterButton() {
 
   return (
     <div className="space-y-3">
-      <Button onClick={register} disabled={state.loading || (connected && !support.supported)} variant="secondary">
+      <Button onClick={register} disabled={state.loading || !isMainnet || (connected && !support.supported)} variant="secondary">
         <ShieldCheck aria-hidden className="h-4 w-4" />
-        {state.loading ? "Registering…" : !connected ? "Connect wallet for Umbra" : support.supported ? "Register wallet with Umbra" : "Use a compatible wallet"}
+        {state.loading ? "Registering…" : !isMainnet ? "Mainnet only" : !connected ? "Connect wallet for Umbra" : support.supported ? "Register wallet with Umbra" : "Use a compatible wallet"}
       </Button>
+      {!isMainnet ? <p className="text-xs text-muted-foreground">Umbra private payments require mainnet. Switch networks to register.</p> : null}
       {state.message ? <p className="text-xs text-muted-foreground">{state.message}</p> : null}
       {state.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
     </div>
