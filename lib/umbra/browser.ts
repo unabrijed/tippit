@@ -55,13 +55,23 @@ async function getClient(wallet: Wallet | null, network: AppNetwork) {
   const signer = sdk.createSignerFromWalletAccount(standardWallet, account);
   const appEnv = getAppEnv(network);
   const rpcUrl = appEnv.rpcUrl;
-  const client = await sdk.getUmbraClient({
-    signer,
-    network: appEnv.umbraNetwork,
-    rpcUrl,
-    rpcSubscriptionsUrl: toSubscriptionsUrl(rpcUrl),
-    indexerApiEndpoint: appEnv.umbraIndexerApiEndpoint
-  });
+
+  // Use the polling forwarder instead of the default WebSocket forwarder.
+  // The WebSocket endpoint on public RPCs (mainnet/devnet) is unreliable and
+  // frequently causes confirmation timeouts even when the tx lands on-chain.
+  // Polling via getSignatureStatuses is slower but far more reliable.
+  const transactionForwarder = sdk.getPollingTransactionForwarder({ rpcUrl });
+
+  const client = await sdk.getUmbraClient(
+    {
+      signer,
+      network: appEnv.umbraNetwork,
+      rpcUrl,
+      rpcSubscriptionsUrl: toSubscriptionsUrl(rpcUrl),
+      indexerApiEndpoint: appEnv.umbraIndexerApiEndpoint
+    },
+    { transactionForwarder }
+  );
   return { sdk, prover, signer, client };
 }
 
