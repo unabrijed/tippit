@@ -58,7 +58,7 @@ async function getClient(wallet: Wallet | null, network: AppNetwork) {
   const deps = await getUmbraDeps();
   const { sdkCore } = deps;
   const { standardWallet, account } = getStandardWalletAccount(wallet);
-  const signer = sdkCore.createSignerFromWalletAccount(standardWallet, account);
+  const signer = sdkCore.createSignerFromWalletAccount({ wallet: standardWallet, account });
   const appEnv = getAppEnv(network);
   const rpcUrl = appEnv.rpcUrl;
 
@@ -95,20 +95,21 @@ async function runRegistration(
   return register({
     confidential: true,
     anonymous: true,
-    callbacks: {
-      userAccountInitialisation: {
-        pre: async () => { onProgress?.("Creating Umbra account…"); },
-        post: async () => { onProgress?.("Account created."); }
+    hooks: {
+      initUserAccount: {
+        onPreSend: async () => { onProgress?.("Creating Umbra account…"); },
+        onPostSend: async () => { onProgress?.("Account created."); }
       },
       registerX25519PublicKey: {
-        pre: async () => { onProgress?.("Registering encryption key…"); },
-        post: async () => { onProgress?.("Encryption key registered."); }
+        onPreSend: async () => { onProgress?.("Registering encryption key…"); },
+        onPostSend: async () => { onProgress?.("Encryption key registered."); }
       },
-      registerUserForAnonymousUsage: {
-        pre: async () => { onProgress?.("Generating registration proof…"); },
-        post: async () => { onProgress?.("Registration complete."); }
+      onZkProofGenerationStart: async () => { onProgress?.("Generating registration proof…"); },
+      registerAnonymousUsage: {
+        onPreSend: async () => { onProgress?.("Submitting registration…"); },
+        onPostSend: async () => { onProgress?.("Registration complete."); }
       }
-    } as any
+    }
   });
 }
 
@@ -249,16 +250,12 @@ export async function claimLatestPrivatePayment(wallet: Wallet | null, args: { r
       throw new Error("No matching private tip was found to claim yet.");
     }
 
+    onProgress?.("Generating claim proof…");
     const burn = sdkBurn.getReceiverBurnableStealthPoolNoteIntoETABurnerFunction(
       { client },
       {
         fetchBatchMerkleProof: client.fetchBatchMerkleProof,
-        zkProver: sdkCore.getClaimReceiverClaimableUtxoIntoEncryptedBalanceProver({
-          callbacks: {
-            onStart: () => onProgress?.("Generating claim proof…"),
-            onComplete: () => onProgress?.("Submitting private claim via relayer…")
-          } as any
-        }) as any,
+        zkProver: sdkCore.getClaimReceiverClaimableUtxoIntoEncryptedBalanceProver() as any,
         relayer: {
           submitBurn: (relayer as any).submitClaim ?? (relayer as any).submitBurn,
           pollBurnStatus: (relayer as any).pollClaimStatus ?? (relayer as any).pollBurnStatus,
@@ -267,6 +264,7 @@ export async function claimLatestPrivatePayment(wallet: Wallet | null, args: { r
       }
     );
 
+    onProgress?.("Submitting private claim via relayer…");
     const result = await burn([target]);
     onProgress?.("Private claim submitted.");
     return {

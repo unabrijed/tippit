@@ -38,6 +38,9 @@
     "tailwind-merge": "^2.5.5",
     "zod": "^3.24.1"
   },
+  "resolutions": {
+    "@umbra-privacy/umbra-codama": "3.0.0-rc.0"
+  },
   "devDependencies": {
     "@types/node": "20.17.14",
     "@types/react": "^18.2.79",

@@ -1124,17 +1124,7 @@
     "@umbra-privacy/umbra-codama" "2.0.2"
     "@wallet-standard/core" "^1.1.0"
 
-"@umbra-privacy/umbra-codama@2.0.2":
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/@umbra-privacy/umbra-codama/-/umbra-codama-2.0.2.tgz#f8271c00e76ff149d67ed0ad9f99895e736440cb"
-  integrity sha512-ogGoHbxTQyvEdaPOyYTAx48XNQgvXcvkt5CdTKwPbRrcb3J6zhYEvrdyFBlOuI8GKjcpITi+5AiPnd41BikRHQ==
-  dependencies:
-    "@solana-program/system" "^0.11.0"
-    "@solana-program/token-2022" "^0.9.0"
-    "@solana/kit" "^6.0.1"
-    "@solana/sysvars" "^6.0.1"
-
-"@umbra-privacy/umbra-codama@3.0.0-rc.0":
+"@umbra-privacy/umbra-codama@2.0.2", "@umbra-privacy/umbra-codama@3.0.0-rc.0":
   version "3.0.0-rc.0"
   resolved "https://registry.yarnpkg.com/@umbra-privacy/umbra-codama/-/umbra-codama-3.0.0-rc.0.tgz#d5a1aee2ef227c3d9cfbeb27f5aa4a7facb1485b"
   integrity sha512-M7EF07WLv5Z4Qv8JpzoG5DC3joHaFHIaDI2qtLHKolGeZ3YLhjIOI73UpMXprEAprtlmAXJkZoSn+UVSt575uQ==
