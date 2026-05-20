@@ -21,6 +21,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!fanWallet) {
     return NextResponse.json({ error: "payerWallet is required." }, { status: 400 });
   }
+  if (fanWallet === intent.receiverWallet) {
+    return NextResponse.json({ error: "Sender and receiver cannot be the same wallet." }, { status: 400 });
+  }
 
   const network = getNetworkFromRequest(request);
   const token: string | undefined = typeof body.token === "string" ? body.token : undefined;

@@ -4,7 +4,7 @@ export const DEFAULT_TOKEN_SYMBOL = "USDC";
 
 const DEFAULT_USDC_MINTS: Record<AppNetwork, string> = {
   mainnet: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  devnet: "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+  devnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
 };
 
 export function getUsdcMint(network: AppNetwork) {

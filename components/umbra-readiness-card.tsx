@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck } from "@phosphor-icons/react/dist/ssr";
+import { ShieldCheck } from "@phosphor-icons/react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { UmbraRegisterButton } from "@/components/umbra-register-button";

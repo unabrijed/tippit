@@ -189,7 +189,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       const confirmResponse = await fetch(`/api/payment-intents/${intentData.id}/confirm`, withNetworkHeaders({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signature })
+        body: JSON.stringify({ signature, isMagicBlock: true })
       }, network));
       const confirmData = await confirmResponse.json();
       if (!confirmResponse.ok) throw new Error(extractApiError(confirmData, "Confirm failed."));

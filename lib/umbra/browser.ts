@@ -75,6 +75,54 @@ async function getClient(wallet: Wallet | null, network: AppNetwork) {
   return { sdk, prover, signer, client };
 }
 
+async function runRegistration(
+  sdk: Awaited<ReturnType<typeof getUmbraDeps>>["sdk"],
+  prover: Awaited<ReturnType<typeof getUmbraDeps>>["prover"],
+  client: Awaited<ReturnType<typeof getClient>>["client"],
+  onProgress?: ProgressCallback
+) {
+  const register = sdk.getUserRegistrationFunction(
+    { client },
+    { zkProver: prover.getUserRegistrationProver() }
+  );
+
+  return register({
+    confidential: true,
+    anonymous: true,
+    callbacks: {
+      userAccountInitialisation: {
+        pre: async () => { onProgress?.("Creating Umbra account…"); },
+        post: async () => { onProgress?.("Account created."); }
+      },
+      registerX25519PublicKey: {
+        pre: async () => { onProgress?.("Registering encryption key…"); },
+        post: async () => { onProgress?.("Encryption key registered."); }
+      },
+      registerUserForAnonymousUsage: {
+        pre: async () => { onProgress?.("Generating registration proof…"); },
+        post: async () => { onProgress?.("Registration complete."); }
+      }
+    } as any
+  });
+}
+
+export async function checkUmbraRegistration(wallet: Wallet | null, network: AppNetwork): Promise<boolean> {
+  try {
+    const support = getUmbraWalletSupport(wallet);
+    if (!support.supported) return false;
+    const { sdk, client } = await getClient(wallet, network);
+    const query = sdk.getUserAccountQuerierFunction({ client });
+    const result = await query(client.signer.address);
+    return (
+      result.state === "exists" &&
+      Boolean((result.data as any)?.isUserAccountX25519KeyRegistered) &&
+      Boolean((result.data as any)?.isUserCommitmentRegistered)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwork, onProgress?: ProgressCallback) {
   const { isRegistrationError } = await import("@umbra-privacy/sdk/errors");
   try {
@@ -95,31 +143,7 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
       return [];
     }
 
-    const register = sdk.getUserRegistrationFunction(
-      { client },
-      { zkProver: prover.getUserRegistrationProver() }
-    );
-
-    const signatures = await register({
-      confidential: true,
-      anonymous: true,
-      callbacks: {
-        userAccountInitialisation: {
-          pre: async () => { onProgress?.("Creating Umbra account…"); },
-          post: async () => { onProgress?.("Account created."); }
-        },
-        registerX25519PublicKey: {
-          pre: async () => { onProgress?.("Registering encryption key…"); },
-          post: async () => { onProgress?.("Encryption key registered."); }
-        },
-        registerUserForAnonymousUsage: {
-          pre: async () => { onProgress?.("Generating registration proof…"); },
-          post: async () => { onProgress?.("Registration complete."); }
-        }
-      } as any
-    });
-
-    return signatures;
+    return await runRegistration(sdk, prover, client, onProgress);
   } catch (error) {
     if (isRegistrationError(error)) {
       switch (error.stage) {
@@ -132,7 +156,7 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
         case "account-fetch":
           throw new Error("Could not read Umbra account state. Check your RPC connection and try again.");
         case "transaction-send":
-          throw new Error("Transaction timed out. The registration may have landed — check the dashboard before retrying.");
+          throw new Error("Registration confirmation timed out after retry. Your account may already be set up — please try the action again.");
         default:
           throw new Error(`Registration failed at stage "${error.stage}": ${error.message}`);
       }

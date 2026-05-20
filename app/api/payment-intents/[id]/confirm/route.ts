@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { Connection } from "@solana/web3.js";
 import { getNetworkFromRequest } from "@/lib/network";
 import { getConnection } from "@/lib/solana/connection";
+import { getMagicBlockEphemeralRpc, getMagicBlockTeeBase } from "@/lib/magicblock/constants";
 import { issueReceiptForIntent, markIntentClaimable, markIntentFailed, markIntentSubmitted } from "@/lib/db/store";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -10,7 +12,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const network = getNetworkFromRequest(request);
-  const connection = getConnection(network);
+
+  // MagicBlock transactions live on the ephemeral rollup RPC, not on the main
+  // Solana chain. Use the ephemeral RPC for confirmation when the caller flags
+  // that this was a MagicBlock payment.
+  let connection: Connection;
+  if (body.isMagicBlock) {
+    const ephemeralRpc = getMagicBlockEphemeralRpc(network) ?? getMagicBlockTeeBase(network);
+    connection = new Connection(ephemeralRpc, "confirmed");
+  } else {
+    connection = getConnection(network);
+  }
+
   await markIntentSubmitted(params.id, body.signature);
   const status = await connection.getSignatureStatus(body.signature, { searchTransactionHistory: true });
   const confirmation = status.value;

@@ -4,7 +4,7 @@ export type SupportedToken = "USDC" | "SOL";
 
 export const DEFAULT_USDC_MINT_BY_NETWORK: Record<AppNetwork, string> = {
   mainnet: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  devnet: "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+  devnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
 };
 
 export const DEFAULT_SOL_AMOUNT = 0.001;
