@@ -13,11 +13,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const network = getNetworkFromRequest(request);
 
-  // MagicBlock transactions live on the ephemeral rollup RPC, not on the main
-  // Solana chain. Use the ephemeral RPC for confirmation when the caller flags
-  // that this was a MagicBlock payment.
+  // MagicBlock transactions can be submitted to either the ephemeral rollup RPC
+  // or the base Solana chain depending on the `sendTo` field returned by MagicBlock.
+  // Only use the ephemeral RPC when sendTo === "ephemeral"; base/mainnet transactions
+  // must be confirmed on the regular Solana connection.
   let connection: Connection;
-  if (body.isMagicBlock) {
+  if (body.isMagicBlock && body.sendTo === "ephemeral") {
     const ephemeralRpc = getMagicBlockEphemeralRpc(network) ?? getMagicBlockTeeBase(network);
     connection = new Connection(ephemeralRpc, "confirmed");
   } else {

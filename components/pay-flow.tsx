@@ -84,6 +84,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
   const networkMatches = link.network === network;
   const isSolPayment = link.tokenType === "SOL";
   const solDisabled = isSolPayment;
+  const noTokenAccount = connected && !walletBalance.loading && walletBalance.value === null && !isSolPayment;
   const canPay = useMemo(() => link.status === "active" && !link.isExpired && networkMatches && !solDisabled, [link.isExpired, link.status, networkMatches, solDisabled]);
   const umbraSupport = useMemo(() => getUmbraWalletSupport(wallet), [wallet]);
   const canPayPrivately = canPay && link.tokenType === "USDC" && connected && umbraSupport.supported;
@@ -108,10 +109,10 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
     const mint = new PublicKey(link.tokenMint);
     const ata = getAssociatedTokenAddressSync(mint, publicKey);
     const accountInfo = await connection.getAccountInfo(ata, "confirmed");
-    if (!accountInfo) throw new Error(`No ${link.tokenSymbol} account found.`);
+    if (!accountInfo) throw new Error(`Your wallet doesn't have a ${link.tokenSymbol} token account on ${network}. Fund your wallet with ${link.tokenSymbol} first.`);
     const balance = await connection.getTokenAccountBalance(ata, "confirmed");
     const available = Number(balance.value.uiAmountString ?? balance.value.uiAmount ?? 0);
-    if (available < link.amount) throw new Error(`Need ${link.amount} ${link.tokenSymbol} (have ${available}).`);
+    if (available < link.amount) throw new Error(`Insufficient ${link.tokenSymbol}: need ${link.amount}, have ${available}.`);
     const lamports = await connection.getBalance(publicKey, "confirmed");
     if (lamports / 1_000_000_000 < SOL_FEE_BUFFER) throw new Error("Need a small amount of SOL for transaction fees.");
   };
@@ -122,6 +123,7 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       return;
     }
     try {
+      await ensureSufficientBalance();
       setState({ loading: true, step: "Creating…", mode: "magicblock" });
       const intentResponse = await fetch("/api/payment-intents", withNetworkHeaders({
         method: "POST",
@@ -189,14 +191,20 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
       const confirmResponse = await fetch(`/api/payment-intents/${intentData.id}/confirm`, withNetworkHeaders({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signature, isMagicBlock: true })
+        body: JSON.stringify({ signature, isMagicBlock: true, sendTo: txData.sendTo })
       }, network));
       const confirmData = await confirmResponse.json();
       if (!confirmResponse.ok) throw new Error(extractApiError(confirmData, "Confirm failed."));
       setState({ loading: false, success: true, mode: "magicblock" });
       window.location.href = `/receipt/${confirmData.receipt.receiptCode}`;
     } catch (error) {
-      setState({ loading: false, error: error instanceof Error ? error.message : "Payment failed.", mode: "magicblock" });
+      const msg = error instanceof Error ? error.message : "Payment failed.";
+      const friendly = /insufficient funds/i.test(msg) || /0x1/.test(msg)
+        ? `Not enough ${link.tokenSymbol} in your wallet to send ${link.amount} ${link.tokenSymbol}.`
+        : /simulation failed/i.test(msg)
+          ? `Transaction simulation failed. Make sure you have enough ${link.tokenSymbol} and SOL for fees.`
+          : msg;
+      setState({ loading: false, error: friendly, mode: "magicblock" });
     }
   };
 
@@ -332,6 +340,11 @@ export function PayFlow({ link }: { link: PaymentLinkRecord }) {
           <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
             <WarningCircle className="h-4 w-4" aria-hidden />
             {umbraSupport.reason ?? "Your wallet does not support Umbra private payments. Try Phantom or Solflare."}
+          </div>
+        ) : noTokenAccount && !state.error ? (
+          <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+            <WarningCircle className="h-4 w-4 shrink-0" aria-hidden />
+            Your wallet has no {link.tokenSymbol} on {network}. Fund your wallet with {link.tokenSymbol} before paying.
           </div>
         ) : state.error ? (
           <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
