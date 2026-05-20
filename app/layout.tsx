@@ -1,18 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, DM_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { DM_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/app-providers";
 import { AppShell } from "@/components/app-shell";
 
-const display = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["400", "600"],
-  variable: "--font-display"
-});
-
 const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-sans"
 });
 
@@ -22,8 +16,8 @@ const mono = DM_Mono({
   variable: "--font-mono"
 });
 
-const siteTitle = "GhostPay";
-const siteDescription = "Private-feeling Solana payment links with a refined merchant and checkout flow.";
+const siteTitle = "Tippit";
+const siteDescription = "Private Solana tip links with Umbra-powered checkout.";
 
 export const metadata: Metadata = {
   applicationName: siteTitle,
@@ -32,17 +26,10 @@ export const metadata: Metadata = {
     template: `%s · ${siteTitle}`
   },
   description: siteDescription,
-  keywords: [
-    "GhostPay",
-    "Solana Pay",
-    "Solana payments",
-    "USDC payment links",
-    "crypto checkout",
-    "privacy-first payments"
-  ],
-  authors: [{ name: "GhostPay" }],
-  creator: "GhostPay",
-  publisher: "GhostPay",
+  keywords: ["Tippit", "Solana Pay", "Solana tips", "USDC tip links", "crypto tips", "privacy-first checkout"],
+  authors: [{ name: "Tippit" }],
+  creator: "Tippit",
+  publisher: "Tippit",
   category: "finance",
   formatDetection: {
     email: false,
@@ -77,16 +64,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F4EF" },
-    { media: "(prefers-color-scheme: dark)", color: "#1A1917" }
-  ]
+  themeColor: "#FAFBFE"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${sans.variable} ${mono.variable}`}>
         <AppProviders>
           <AppShell>{children}</AppShell>
         </AppProviders>

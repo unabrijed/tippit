@@ -5,7 +5,7 @@ import type { Adapter } from "@solana/wallet-adapter-base";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { ThemeProvider } from "@/components/theme-provider";
+
 import { NetworkProvider, useNetwork } from "@/components/network-provider";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -55,10 +55,8 @@ function adaptersCleanup(wallets: Adapter[]) {
 
 export function WalletProviders({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider>
-      <NetworkProvider>
-        <WalletLayer>{children}</WalletLayer>
-      </NetworkProvider>
-    </ThemeProvider>
+    <NetworkProvider>
+      <WalletLayer>{children}</WalletLayer>
+    </NetworkProvider>
   );
 }

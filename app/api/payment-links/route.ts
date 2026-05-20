@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       {
-        error: "Invalid payment link payload.",
+        error: "Invalid tip link payload.",
         errors: Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message]))
       },
       { status: 400 }

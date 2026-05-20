@@ -17,7 +17,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
     const link = await getPaymentLinkById(intent.paymentLinkId);
     if (link?.tokenType === "USDC" && link.privacyMode === "umbra_utxo") {
-      return NextResponse.json({ error: "This USDC payment link is private-only and must be paid through Umbra." }, { status: 400 });
+      return NextResponse.json({ error: "This USDC tip link is private-only and must be sent through Umbra." }, { status: 400 });
     }
     const transaction = await buildPublicTransferTransaction({
       payerWallet: body.payerWallet ?? intent.payerWallet ?? "",

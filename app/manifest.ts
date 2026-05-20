@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "GhostPay",
-    short_name: "GhostPay",
-    description: "Private-feeling Solana payment links with a refined merchant and checkout flow.",
+    name: "Tippit",
+    short_name: "Tippit",
+    description: "Private-first Solana tip links with Umbra-inspired checkout and cleaner supporter flows.",
     start_url: "/",
     display: "standalone",
     background_color: "#F7F4EF",

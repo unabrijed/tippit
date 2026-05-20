@@ -42,7 +42,7 @@ export function UmbraRegisterButton() {
         <ShieldCheck aria-hidden className="h-4 w-4" />
         {state.loading ? "Registering…" : !connected ? "Connect wallet for Umbra" : support.supported ? "Register wallet with Umbra" : "Use a compatible wallet"}
       </Button>
-      {state.message ? <p className="text-xs text-ghost-smoke dark:text-[#C9C1B8]">{state.message}</p> : null}
+      {state.message ? <p className="text-xs text-muted-foreground">{state.message}</p> : null}
       {state.error ? <p className="text-xs text-destructive">{state.error}</p> : null}
     </div>
   );

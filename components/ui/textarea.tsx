@@ -5,7 +5,7 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
     <textarea
       {...props}
       className={cn(
-        "flex min-h-[120px] w-full rounded-md border border-border bg-input px-4 py-3 text-sm text-foreground shadow-none outline-none placeholder:text-ghost-veil focus-visible:border-ghost-mist focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        "flex min-h-[100px] w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-accent/40 focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-40",
         props.className
       )}
     />

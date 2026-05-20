@@ -1,0 +1,16 @@
+import { NextResponse } from "next/server";
+import { getNetworkFromRequest } from "@/lib/network";
+import { getMagicBlockChallenge } from "@/lib/magicblock/auth";
+import { challengeSchema } from "@/lib/tippit/validators";
+
+export async function POST(request: Request) {
+  const payload = await request.json();
+  const parsed = challengeSchema.safeParse(payload);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "walletAddress is required." }, { status: 400 });
+  }
+
+  const network = getNetworkFromRequest(request);
+  const challenge = await getMagicBlockChallenge(parsed.data.walletAddress, network);
+  return NextResponse.json(challenge);
+}

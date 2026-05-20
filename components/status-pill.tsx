@@ -1,24 +1,28 @@
 import { cn } from "@/lib/utils";
-import type { LinkStatus, PaymentStatus } from "@/lib/types";
 
-const styles: Record<PaymentStatus | LinkStatus, string> = {
-  active: "border-ghost-pine/30 bg-ghost-pine/10 text-ghost-pine dark:bg-ghost-ivory/10 dark:text-ghost-ivory",
-  draft: "border-border bg-ghost-cream text-ghost-smoke dark:bg-white/5 dark:text-[#D4CEC6]",
-  paid: "border-ghost-sage/40 bg-ghost-sage/15 text-[#2C5A4A] dark:text-[#C7E1D7]",
-  expired: "border-border bg-ghost-cream text-ghost-veil dark:bg-white/5",
-  cancelled: "border-destructive/20 bg-destructive/10 text-destructive",
-  created: "border-ghost-gold/40 bg-ghost-gold/15 text-[#8A6A30]",
-  awaiting_signature: "border-ghost-gold/40 bg-ghost-gold/15 text-[#8A6A30]",
-  submitted: "border-ghost-gold/40 bg-ghost-gold/15 text-[#8A6A30]",
-  confirmed: "border-ghost-pine/30 bg-ghost-pine/10 text-ghost-pine dark:bg-ghost-ivory/10 dark:text-ghost-ivory",
-  claimable: "border-ghost-sage/40 bg-ghost-sage/15 text-[#2C5A4A] dark:text-[#C7E1D7]",
-  claimed: "border-ghost-sand/50 bg-ghost-sand/20 text-ghost-smoke dark:text-[#E2D5C1]",
-  failed: "border-destructive/30 bg-destructive/10 text-destructive"
-};
+export function StatusPill({ status, children }: { status: string; children?: React.ReactNode }) {
+  const styles: Record<string, string> = {
+    active: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    paid: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    confirmed: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    claimable: "bg-accent-soft text-accent border-accent/20",
+    claimed: "bg-slate-50 text-slate-500 border-slate-200",
+    expired: "bg-slate-50 text-slate-400 border-slate-200",
+    failed: "bg-destructive/10 text-destructive border-destructive/20",
+    cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+    draft: "bg-slate-50 text-slate-500 border-slate-200",
+    created: "bg-blue-50 text-blue-600 border-blue-200",
+    awaiting_signature: "bg-amber-50 text-amber-600 border-amber-200",
+    submitted: "bg-amber-50 text-amber-600 border-amber-200",
+  };
 
-export function StatusPill({ status, children }: { status: PaymentStatus | LinkStatus; children?: React.ReactNode }) {
   return (
-    <span className={cn("inline-flex min-h-8 items-center rounded-md border px-3 text-xs font-medium uppercase tracking-[0.18em]", styles[status])}>
+    <span
+      className={cn(
+        "inline-flex min-h-7 items-center rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wider",
+        styles[status] ?? "bg-slate-50 text-slate-500 border-slate-200"
+      )}
+    >
       {children ?? status.replace(/_/g, " ")}
     </span>
   );

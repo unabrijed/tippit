@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import path from "path";
 import type { SupportedToken } from "@/lib/solana/tokens";
 import { slugify } from "@/lib/format";
@@ -38,7 +39,9 @@ const paymentLinks = new Map<string, PaymentLinkRecord>();
 const paymentIntents = new Map<string, PaymentIntentRecord>();
 const receipts = new Map<string, ReceiptRecord>();
 const paymentEvents: EventRecord[] = [];
-const localStorePath = path.join(process.cwd(), ".ghostpay", "store.json");
+const localStorePath = process.env.VERCEL
+  ? path.join(tmpdir(), "tippit", "store.json")
+  : path.join(process.cwd(), ".tippit", "store.json");
 let memoryLoaded = false;
 
 type LocalStoreSnapshot = {
@@ -50,15 +53,15 @@ type LocalStoreSnapshot = {
 };
 
 const keys = {
-  merchant: (walletAddress: string, network: AppNetwork) => `ghostpay:merchant:${network}:${walletAddress}`,
-  paymentLink: (id: string) => `ghostpay:payment-link:${id}`,
-  paymentLinkBySlug: (slug: string) => `ghostpay:payment-link:slug:${slug}`,
-  paymentLinksByWallet: (walletAddress: string, network: AppNetwork) => `ghostpay:payment-links:wallet:${network}:${walletAddress}`,
-  paymentIntent: (id: string) => `ghostpay:payment-intent:${id}`,
-  paymentIntentsByWallet: (walletAddress: string, network: AppNetwork) => `ghostpay:payment-intents:wallet:${network}:${walletAddress}`,
-  receipt: (code: string) => `ghostpay:receipt:${code}`,
-  receiptByPaymentIntent: (paymentIntentId: string) => `ghostpay:receipt:payment-intent:${paymentIntentId}`,
-  paymentEvents: "ghostpay:payment-events"
+  merchant: (walletAddress: string, network: AppNetwork) => `tippit:merchant:${network}:${walletAddress}`,
+  paymentLink: (id: string) => `tippit:payment-link:${id}`,
+  paymentLinkBySlug: (slug: string) => `tippit:payment-link:slug:${slug}`,
+  paymentLinksByWallet: (walletAddress: string, network: AppNetwork) => `tippit:payment-links:wallet:${network}:${walletAddress}`,
+  paymentIntent: (id: string) => `tippit:payment-intent:${id}`,
+  paymentIntentsByWallet: (walletAddress: string, network: AppNetwork) => `tippit:payment-intents:wallet:${network}:${walletAddress}`,
+  receipt: (code: string) => `tippit:receipt:${code}`,
+  receiptByPaymentIntent: (paymentIntentId: string) => `tippit:receipt:payment-intent:${paymentIntentId}`,
+  paymentEvents: "tippit:payment-events"
 } as const;
 
 function normalizeMerchantRecord(merchant: MerchantRecord | (Omit<MerchantRecord, "network"> & { network?: AppNetwork })) : MerchantRecord {
@@ -102,8 +105,12 @@ function hydrateMemory(snapshot: LocalStoreSnapshot) {
 }
 
 async function persistMemory() {
-  await mkdir(path.dirname(localStorePath), { recursive: true });
-  await writeFile(localStorePath, JSON.stringify(getLocalSnapshot(), null, 2), "utf8");
+  try {
+    await mkdir(path.dirname(localStorePath), { recursive: true });
+    await writeFile(localStorePath, JSON.stringify(getLocalSnapshot(), null, 2), "utf8");
+  } catch (error) {
+    console.warn("Failed to persist Tippit local store; continuing with in-memory storage.", error);
+  }
 }
 
 async function ensureMemoryLoaded() {
@@ -180,7 +187,7 @@ export async function upsertMerchant(walletAddress: string, displayName?: string
       await persistMemory();
       return next;
     }
-    const merchant: MerchantRecord = { id: randomUUID(), walletAddress, displayName: displayName || "Ghost merchant", network, createdAt: now() };
+    const merchant: MerchantRecord = { id: randomUUID(), walletAddress, displayName: displayName || "Tippit creator", network, createdAt: now() };
     merchants.set(merchant.id, merchant);
     await persistMemory();
     return merchant;
@@ -189,7 +196,7 @@ export async function upsertMerchant(walletAddress: string, displayName?: string
   const existing = await getJsonValue<MerchantRecord>(keys.merchant(walletAddress, network));
   const merchant: MerchantRecord = existing
     ? { ...existing, displayName: displayName || existing.displayName }
-    : { id: randomUUID(), walletAddress, displayName: displayName || "Ghost merchant", network, createdAt: now() };
+    : { id: randomUUID(), walletAddress, displayName: displayName || "Tippit creator", network, createdAt: now() };
   await setJsonValue(keys.merchant(walletAddress, network), merchant);
   return merchant;
 }
@@ -300,10 +307,10 @@ export async function getPaymentLinkById(id: string) {
 export async function createPaymentIntent(input: { paymentLinkId: string; payerWallet?: string; amount: number; tokenMint?: string; tokenType?: SupportedToken; network: AppNetwork }) {
   await ensureMemoryLoaded();
   const link = await getPaymentLinkById(input.paymentLinkId);
-  if (!link) throw new Error("Payment link not found.");
-  if (link.network !== input.network) throw new Error(`This payment link belongs to ${link.network}, but ${input.network} is selected.`);
-  if (link.status !== "active") throw new Error("This payment link is not active.");
-  if (link.isExpired) throw new Error("This payment link has expired.");
+  if (!link) throw new Error("Tip link not found.");
+  if (link.network !== input.network) throw new Error(`This tip link belongs to ${link.network}, but ${input.network} is selected.`);
+  if (link.status !== "active") throw new Error("This tip link is not active.");
+  if (link.isExpired) throw new Error("This tip link has expired.");
 
   const valkey = getValkeyClient();
   const id = randomUUID();
@@ -431,7 +438,7 @@ export async function issueReceiptForIntent(id: string) {
     amount: intent.amount,
     tokenSymbol: intent.tokenSymbol,
     network: intent.network,
-    displayName: link?.displayName ?? "Ghost merchant",
+    displayName: link?.displayName ?? "Tippit creator",
     createdAt: now()
   };
 

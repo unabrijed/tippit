@@ -13,33 +13,40 @@ export function UmbraReadinessCard() {
   const { config } = useNetwork();
 
   return (
-    <Card className="bg-card/80">
-      <CardContent className="space-y-4 p-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ghost-pine/10 text-ghost-pine dark:bg-ghost-ivory/10 dark:text-ghost-ivory">
-            <ShieldCheck aria-hidden className="h-5 w-5" />
+    <Card>
+      <CardContent className="space-y-5 p-5 md:p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[18px] border border-white/80 bg-[linear-gradient(135deg,rgba(83,115,255,0.12),rgba(80,190,255,0.16))] text-[#4357d0] shadow-[0_12px_30px_rgba(83,115,255,0.14)]">
+            <ShieldCheck aria-hidden className="h-6 w-6" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-medium text-ghost-ink dark:text-ghost-ivory">Umbra execution layer is now partially live</p>
-            <p className="text-sm leading-6 text-ghost-smoke dark:text-[#C9C1B8]">
-              Wallet registration is wired, private receiver-claimable sends can be attempted from checkout, and claim flows can now be executed from the merchant dashboard.
-            </p>
+            <p className="text-xl font-semibold tracking-[-0.03em] text-foreground">Umbra readiness</p>
+            <p className="text-sm leading-6 text-muted-foreground">Register wallet. Create private USDC tip. Claim from monitor.</p>
           </div>
         </div>
-        <div className="rounded-md border border-border bg-background px-4 py-3 text-sm text-ghost-smoke dark:text-[#C9C1B8]">
+        <div className="rounded-[24px] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">
           {!connected
-            ? "Connect a compatible wallet to register for Umbra and use private payments."
+            ? "Connect a compatible wallet to register and use private tipping."
             : support.supported
-              ? `Umbra is ready with ${support.walletName ?? "your wallet"}.`
+              ? `Ready with ${support.walletName ?? "your wallet"}.`
               : support.reason}
         </div>
-        <div className="grid gap-3 text-xs uppercase tracking-[0.18em] text-ghost-smoke md:grid-cols-3 dark:text-[#C9C1B8]">
-          <div className="rounded-md border border-border px-3 py-3">Network · {config.label}</div>
-          <div className="rounded-md border border-border px-3 py-3">Indexer · configured</div>
-          <div className="rounded-md border border-border px-3 py-3">Relayer · configured</div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <ReadinessTile label="Network" value={config.label} />
+          <ReadinessTile label="Indexer" value="Configured" />
+          <ReadinessTile label="Relayer" value="Configured" />
         </div>
         <UmbraRegisterButton />
       </CardContent>
     </Card>
+  );
+}
+
+function ReadinessTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border border-white/80 bg-white/80 px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm font-medium text-foreground">{value}</p>
+    </div>
   );
 }

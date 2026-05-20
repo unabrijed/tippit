@@ -20,7 +20,7 @@ function normalizeUmbraError(error: unknown) {
   const message = error instanceof Error ? error.message : "Umbra operation failed.";
   if (message.includes("Wallet Standard")) return "Your wallet does not expose the signing features Umbra needs. Try Phantom or Solflare in browser mode.";
   if (message.includes("User rejected") || message.includes("declined") || message.includes("rejected")) return "The wallet request was cancelled.";
-  if (message.includes("No matching private payment")) return message;
+  if (message.includes("No matching private payment")) return message.replaceAll("private payment", "private tip");
   if (message.includes("fetch") || message.includes("network")) return "Umbra network services were unreachable. Check RPC, indexer, or relayer configuration and try again.";
   return message;
 }
@@ -92,7 +92,7 @@ export async function createPrivatePayment(wallet: Wallet | null, args: { receiv
     const { prover } = await getUmbraDeps();
 
     await registerUmbraUser(wallet, args.network, onProgress);
-    onProgress?.("Generating private payment proof…");
+    onProgress?.("Generating private tip proof…");
 
     const createUtxo = sdk.getPublicBalanceToReceiverClaimableUtxoCreatorFunction(
       { client },
@@ -100,7 +100,7 @@ export async function createPrivatePayment(wallet: Wallet | null, args: { receiv
         zkProver: prover.getCreateReceiverClaimableUtxoFromPublicBalanceProver({
           callbacks: {
             onStart: () => onProgress?.("Creating receiver-claimable private UTXO…"),
-            onComplete: () => onProgress?.("Submitting private payment transaction…")
+            onComplete: () => onProgress?.("Submitting private tip transaction…")
           } as any
         })
       }
@@ -115,7 +115,7 @@ export async function createPrivatePayment(wallet: Wallet | null, args: { receiv
       {}
     );
 
-    onProgress?.("Private payment submitted.");
+    onProgress?.("Private tip submitted.");
     return result;
   } catch (error) {
     throw new Error(normalizeUmbraError(error));
@@ -150,7 +150,7 @@ export async function claimLatestPrivatePayment(wallet: Wallet | null, args: { r
     const candidates = [...scanned.publicReceived, ...scanned.received];
     const target = pickBestClaimCandidate(candidates, args.receiverAddress, args.amount);
     if (!target) {
-      throw new Error("No matching private payment was found to claim yet.");
+      throw new Error("No matching private tip was found to claim yet.");
     }
 
     const fetchBatchMerkleProof = sdk.getBatchMerkleProofFetcher({ apiEndpoint: appEnv.umbraIndexerApiEndpoint } as any);

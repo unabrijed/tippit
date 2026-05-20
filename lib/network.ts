@@ -1,6 +1,6 @@
 import { Cluster } from "@solana/web3.js";
 
-export const NETWORK_HEADER = "x-ghostpay-network";
+export const NETWORK_HEADER = "x-tippit-network";
 export const APP_NETWORKS = ["mainnet", "devnet"] as const;
 export type AppNetwork = (typeof APP_NETWORKS)[number];
 

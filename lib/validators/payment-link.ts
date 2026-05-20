@@ -16,6 +16,6 @@ export const paymentLinkSchema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tokenMint"], message: "Provide a valid USDC mint." });
   }
   if (value.tokenType === "USDC" && value.privacyMode === "public_transfer") {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["privacyMode"], message: "USDC links must use Umbra private payments." });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["privacyMode"], message: "USDC tip links must use Umbra private tipping." });
   }
 });

@@ -13,7 +13,7 @@ function hasFeatureSet(features: Record<string, unknown> | undefined, candidates
 
 export function getUmbraWalletSupport(wallet: Wallet | null): UmbraWalletSupport {
   if (!wallet) {
-    return { supported: false, reason: "Connect a compatible Wallet Standard wallet to use Umbra private payments." };
+    return { supported: false, reason: "Connect a compatible Wallet Standard wallet to use Umbra private tipping." };
   }
 
   const adapter = wallet.adapter as any;

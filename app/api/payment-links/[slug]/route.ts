@@ -4,7 +4,7 @@ import { getPaymentLinkBySlug } from "@/lib/db/store";
 export async function GET(_: Request, { params }: { params: { slug: string } }) {
   const link = await getPaymentLinkBySlug(params.slug);
   if (!link) {
-    return NextResponse.json({ error: "Payment link not found." }, { status: 404 });
+    return NextResponse.json({ error: "Tip link not found." }, { status: 404 });
   }
 
   return NextResponse.json({

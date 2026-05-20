@@ -1,0 +1,35 @@
+{
+  "merchants": [
+    {
+      "id": "5c25248c-e559-4e64-81b7-5e8e092569fc",
+      "walletAddress": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "displayName": "Tippit creator",
+      "network": "mainnet",
+      "createdAt": "2026-05-19T23:34:22.459Z"
+    }
+  ],
+  "paymentLinks": [
+    {
+      "id": "4345ba48-0a35-49ae-9640-a7d3e755e303",
+      "merchantId": "5c25248c-e559-4e64-81b7-5e8e092569fc",
+      "receiverWallet": "JCwBm3ZhprZDQ8yrYLrSWnpYiyP8SNDthqQEaFgCw5hi",
+      "displayName": "Tippit creator",
+      "slug": "private-support-4345ba",
+      "title": "Private support",
+      "amount": 0.01,
+      "tokenType": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "tokenSymbol": "USDC",
+      "network": "mainnet",
+      "linkType": "one_time",
+      "privacyMode": "umbra_utxo",
+      "status": "active",
+      "expiresAt": "2026-05-20T18:04:00.000Z",
+      "createdAt": "2026-05-19T23:34:22.578Z",
+      "updatedAt": "2026-05-19T23:34:22.578Z"
+    }
+  ],
+  "paymentIntents": [],
+  "receipts": [],
+  "paymentEvents": []
+}

@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Check, Copy } from "@phosphor-icons/react";
+import { Check, Copy, Lock, LockOpen, Wallet } from "@phosphor-icons/react";
 import { useNetwork } from "@/components/network-provider";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { withNetworkHeaders } from "@/lib/network-request";
@@ -14,15 +12,14 @@ import { getTokenConfig, type SupportedToken } from "@/lib/solana/tokens";
 
 export function CreateLinkForm() {
   const { publicKey, connected } = useWallet();
-  const { network, config } = useNetwork();
+  const { network } = useNetwork();
   const defaultUsdc = getTokenConfig("USDC", network);
-  const defaultSol = getTokenConfig("SOL", network);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ url: string; id: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({
-    title: "Untitled payment",
+    title: "Private support",
     description: "",
     amount: String(defaultUsdc.defaultAmount),
     tokenType: "USDC" as SupportedToken,
@@ -40,7 +37,7 @@ export function CreateLinkForm() {
       amount: String(active.defaultAmount),
       tokenMint: active.mint ?? ""
     }));
-  }, [network]);
+  }, [network, form.tokenType]);
 
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -58,7 +55,7 @@ export function CreateLinkForm() {
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!publicKey) {
-      setErrors({ wallet: "Connect a merchant wallet first." });
+      setErrors({ wallet: "Connect wallet first." });
       return;
     }
 
@@ -102,7 +99,7 @@ export function CreateLinkForm() {
 
     const data = await response.json();
     if (!response.ok) {
-      setErrors(data.errors ?? { form: data.error ?? "Could not create payment link." });
+      setErrors(data.errors ?? { form: data.error ?? "Could not create link." });
       setSubmitting(false);
       return;
     }
@@ -116,99 +113,148 @@ export function CreateLinkForm() {
     } catch {}
   };
 
+  // Success state
+  if (result) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-6 py-12">
+          <div className="icon-circle-lg animate-scale-in text-success">
+            <Check className="h-7 w-7" weight="bold" />
+          </div>
+          <p className="text-lg font-semibold text-foreground">Link created</p>
+          <div className="flex w-full items-center gap-2 rounded-xl border border-border bg-muted/50 p-2">
+            <input readOnly value={result.url} onFocus={(e) => e.target.select()} className="mono-address flex-1 bg-transparent px-2 text-xs text-foreground outline-none" />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(result.url);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 2000);
+                } catch {}
+              }}
+            >
+              {copied ? <Check aria-hidden className="h-3.5 w-3.5" /> : <Copy aria-hidden className="h-3.5 w-3.5" />}
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <a href={result.url} className="text-sm font-medium text-accent hover:underline">Open link →</a>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="bg-card/80">
-      <CardContent className="p-6 md:p-8">
-        <form className="space-y-6" onSubmit={submit}>
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-ghost-smoke">Merchant wallet</p>
-              <span className="inline-flex min-h-8 items-center rounded-full border border-border bg-background px-3 text-[11px] font-medium uppercase tracking-[0.18em] text-ghost-smoke">
-                {config.label} · {config.cluster}
-              </span>
+    <Card>
+      <CardContent className="space-y-6 py-8">
+        {/* Wallet indicator */}
+        <div className="flex items-center gap-2">
+          {connected && publicKey ? (
+            <>
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="mono-address text-xs text-muted-foreground">{publicKey.toBase58().slice(0, 8)}…</span>
+            </>
+          ) : (
+            <>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Connect wallet</span>
+            </>
+          )}
+          {errors.wallet ? <span className="text-xs text-destructive">{errors.wallet}</span> : null}
+        </div>
+
+        <form className="space-y-5" onSubmit={submit}>
+          {/* Amount — hero-sized */}
+          <div className="flex flex-col items-center gap-3 py-4">
+            <div className="flex items-end gap-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.amount}
+                onChange={(e) => update("amount", e.target.value)}
+                className="w-32 bg-transparent text-center text-5xl font-bold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
+                placeholder="0"
+                aria-label="Amount"
+              />
+              {/* Token toggle */}
+              <div className="flex items-center gap-1 pb-2">
+                {(["USDC", "SOL"] as SupportedToken[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => updateTokenType(t)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition ${
+                      form.tokenType === t
+                        ? "bg-foreground text-white"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="rounded-md border border-border bg-background px-4 py-3 text-sm text-ghost-smoke">
-              {connected && publicKey ? publicKey.toBase58() : "Connect a wallet to create a payment link."}
-            </div>
-            {errors.wallet ? <p className="text-xs text-destructive">{errors.wallet}</p> : null}
+            {errors.amount ? <p className="text-xs text-destructive">{errors.amount}</p> : null}
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Merchant name" htmlFor="displayName" helper="Shown instead of a raw wallet by default.">
-              <Input id="displayName" value={form.displayName} onChange={(e) => update("displayName", e.target.value)} placeholder="Shoonya Studio" autoComplete="organization" />
-            </Field>
-            <Field label="Title" htmlFor="title" helper="What the payer is paying for.">
-              <Input id="title" value={form.title} onChange={(e) => update("title", e.target.value)} placeholder="Design assignment" autoComplete="off" aria-invalid={errors.title ? "true" : undefined} aria-describedby={errors.title ? "title-error" : undefined} />
-              {errors.title ? <p id="title-error" className="text-xs text-destructive">{errors.title}</p> : null}
-            </Field>
-            <Field label="Payment token" htmlFor="tokenType" helper="Default is 1 USDC or 0.001 SOL.">
-              <Select id="tokenType" value={form.tokenType} onChange={(e) => updateTokenType(e.target.value as SupportedToken)}>
-                <option value="USDC">USDC</option>
-                <option value="SOL">SOL</option>
-              </Select>
-            </Field>
-            <Field label="Amount" htmlFor="amount" helper={form.tokenType === "USDC" ? "Defaults to 1 USDC." : "Defaults to 0.001 SOL."}>
-              <Input id="amount" type="text" inputMode="decimal" value={form.amount} onChange={(e) => update("amount", e.target.value)} placeholder={form.tokenType === "USDC" ? "1" : "0.001"} aria-invalid={errors.amount ? "true" : undefined} aria-describedby={errors.amount ? "amount-error" : undefined} />
-              {errors.amount ? <p id="amount-error" className="text-xs text-destructive">{errors.amount}</p> : null}
-            </Field>
-            <Field label="Expiry" htmlFor="expiresAt" helper="After expiry, the link will reject new payments.">
-              <Input id="expiresAt" type="datetime-local" value={form.expiresAt} onChange={(e) => update("expiresAt", e.target.value)} />
-            </Field>
-            <Field label="Link type" htmlFor="linkType" helper="One-time is recommended for invoices.">
-              <Select id="linkType" value={form.linkType} onChange={(e) => update("linkType", e.target.value)}>
-                <option value="one_time">One-time</option>
-                <option value="reusable">Reusable</option>
-              </Select>
-            </Field>
-            <Field label="USDC mint" htmlFor="tokenMint" helper={form.tokenType === "USDC" ? `${config.label} USDC by default. Override if your mint differs.` : "Not needed for native SOL payments."}>
-              <Input id="tokenMint" value={form.tokenMint} onChange={(e) => update("tokenMint", e.target.value)} spellCheck={false} className="mono-address" disabled={form.tokenType === "SOL"} />
-            </Field>
-          </div>
+          {/* Name */}
+          <Input
+            value={form.displayName}
+            onChange={(e) => update("displayName", e.target.value)}
+            placeholder="Your name"
+            autoComplete="organization"
+          />
 
-          <div className="rounded-md border border-ghost-pine/20 bg-ghost-pine/5 px-4 py-3 text-sm text-ghost-smoke dark:text-[#D4CEC6]">
-            {form.tokenType === "USDC"
-              ? "USDC links are Umbra-private by default and do not allow a public transfer fallback."
-              : "SOL links use the public transfer path. Umbra private payments are currently enabled for USDC links."}
-          </div>
+          {/* Row: Privacy toggle + Type toggle + Expiry */}
+          <div className="flex items-center gap-3">
+            {/* Privacy */}
+            {form.tokenType === "USDC" ? (
+              <button
+                type="button"
+                onClick={() => update("privacyMode", form.privacyMode === "umbra_utxo" ? "public_transfer" : "umbra_utxo")}
+                className={`inline-flex h-10 items-center gap-2 rounded-full border px-3 text-xs font-medium transition ${
+                  form.privacyMode === "umbra_utxo"
+                    ? "border-accent/20 bg-accent-soft text-accent"
+                    : "border-border bg-white text-muted-foreground"
+                }`}
+                title={form.privacyMode === "umbra_utxo" ? "Private route" : "Public route"}
+              >
+                {form.privacyMode === "umbra_utxo" ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
+                {form.privacyMode === "umbra_utxo" ? "Private" : "Public"}
+              </button>
+            ) : null}
 
-          <Field label="Description" htmlFor="description" helper="Optional public context for the payer.">
-            <Textarea id="description" value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Private bounty payout for the final design sprint." />
-          </Field>
+            {/* Type */}
+            <button
+              type="button"
+              onClick={() => update("linkType", form.linkType === "one_time" ? "reusable" : "one_time")}
+              className={`inline-flex h-10 items-center rounded-full border px-3 text-xs font-medium transition ${
+                form.linkType === "reusable"
+                  ? "border-accent/20 bg-accent-soft text-accent"
+                  : "border-border bg-white text-muted-foreground"
+              }`}
+            >
+              {form.linkType === "reusable" ? "Reusable" : "One-time"}
+            </button>
+
+            {/* Expiry — compact */}
+            <input
+              type="datetime-local"
+              value={form.expiresAt}
+              onChange={(e) => update("expiresAt", e.target.value)}
+              className="h-10 flex-1 rounded-full border border-border bg-white px-3 text-xs text-muted-foreground outline-none focus-visible:border-accent/40"
+            />
+          </div>
 
           {errors.form ? <p className="text-sm text-destructive">{errors.form}</p> : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button type="submit" disabled={submitting} aria-busy={submitting}>
-              {submitting ? "Creating link…" : `Create ${config.label.toLowerCase()} ${form.tokenType} link`}
-            </Button>
-            <p className="text-sm text-ghost-smoke dark:text-[#C9C1B8]">GhostPay stores metadata only. Funds move wallet-to-wallet on Solana.</p>
-          </div>
+          <Button type="submit" disabled={submitting} aria-busy={submitting} className="w-full">
+            {submitting ? "Creating…" : "Create"}
+          </Button>
         </form>
-
-        {result ? (
-          <div className="mt-6 rounded-lg border border-ghost-pine/20 bg-ghost-pine/5 p-4 text-sm text-ghost-pine dark:bg-ghost-ivory/10 dark:text-ghost-ivory">
-            <p className="font-medium">Payment link created on {config.label}.</p>
-            <div className="mt-2 flex items-center gap-2">
-              <input readOnly value={result.url} onFocus={(e) => e.target.select()} className="mono-address w-full flex-1 rounded-md border border-ghost-pine/20 bg-background px-3 py-2 text-xs text-ghost-ink dark:text-ghost-ivory" />
-              <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(result.url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); } catch {} }} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-ghost-pine/20 px-3 text-xs font-medium transition hover:bg-ghost-pine/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                {copied ? <Check aria-hidden className="h-3.5 w-3.5" /> : <Copy aria-hidden className="h-3.5 w-3.5" />}
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-            <a href={result.url} className="mt-2 inline-block text-xs underline-offset-4 hover:underline">Open link</a>
-          </div>
-        ) : null}
       </CardContent>
     </Card>
-  );
-}
-
-function Field({ label, htmlFor, helper, children }: { label: string; htmlFor: string; helper: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className="text-sm font-medium text-ghost-ink dark:text-ghost-ivory">{label}</label>
-      {children}
-      <p className="text-xs text-ghost-smoke dark:text-[#C9C1B8]">{helper}</p>
-    </div>
   );
 }

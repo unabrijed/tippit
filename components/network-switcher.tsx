@@ -6,10 +6,10 @@ export function NetworkSwitcher() {
   const { network, setNetwork } = useNetwork();
 
   return (
-    <div className="inline-flex min-h-11 items-center rounded-full border border-border/70 bg-card/80 p-1">
+    <div className="inline-flex items-center rounded-full border border-border bg-white p-0.5">
       {[
-        { id: "mainnet", label: "Mainnet" },
-        { id: "devnet", label: "Devnet" }
+        { id: "mainnet", color: "bg-emerald-500" },
+        { id: "devnet", color: "bg-amber-400" }
       ].map((option) => {
         const active = option.id === network;
         return (
@@ -17,14 +17,14 @@ export function NetworkSwitcher() {
             key={option.id}
             type="button"
             onClick={() => setNetwork(option.id as typeof network)}
-            className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-medium uppercase tracking-[0.16em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-              active
-                ? "bg-ghost-pine text-ghost-ivory"
-                : "text-ghost-smoke hover:bg-ghost-pine/5 hover:text-ghost-pine dark:hover:bg-ghost-ivory/10 dark:hover:text-ghost-ivory"
+            className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-semibold uppercase tracking-wider transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              active ? "bg-foreground text-white" : "text-muted-foreground hover:text-foreground"
             }`}
             aria-pressed={active}
+            title={option.id}
           >
-            {option.label}
+            <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-white" : option.color}`} />
+            <span className="hidden sm:inline">{option.id === "mainnet" ? "Main" : "Dev"}</span>
           </button>
         );
       })}

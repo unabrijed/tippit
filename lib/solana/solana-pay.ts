@@ -6,12 +6,12 @@ export function getSolanaPayTransferUrl(link: PaymentLinkRecord) {
   if (link.tokenType === "USDC" && link.tokenMint) {
     url.searchParams.set("spl-token", link.tokenMint);
   }
-  url.searchParams.set("label", `${link.displayName} · GhostPay`);
+  url.searchParams.set("label", `${link.displayName} · Tippit`);
   url.searchParams.set("message", link.title);
-  url.searchParams.set("memo", `ghostpay:${link.slug}`);
+  url.searchParams.set("memo", `tippit:${link.slug}`);
   return url.toString();
 }
 
-export function getGhostPayCheckoutUrl(link: PaymentLinkRecord) {
+export function getTippitCheckoutUrl(link: PaymentLinkRecord) {
   return `/pay/${link.slug}`;
 }

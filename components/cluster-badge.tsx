@@ -8,10 +8,10 @@ export function ClusterBadge() {
 
   return (
     <div
-      className={`hidden min-h-11 items-center rounded-full border px-3 text-xs font-medium uppercase tracking-[0.18em] md:inline-flex ${
+      className={`hidden min-h-11 items-center rounded-full border px-3 text-[11px] font-semibold uppercase tracking-[0.2em] md:inline-flex ${
         isMainnet
-          ? "border-ghost-mist/60 bg-ghost-cream/60 text-ghost-smoke dark:bg-white/5 dark:text-[#D4CEC6]"
-          : "border-ghost-gold/40 bg-ghost-gold/10 text-[#8A6A30]"
+          ? "border-slate-200 bg-white/80 text-slate-700"
+          : "border-amber-200 bg-amber-50 text-amber-700"
       }`}
     >
       {config.label}

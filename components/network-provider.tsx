@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { APP_NETWORKS, DEFAULT_APP_NETWORK, type AppNetwork, getAppNetworkConfig, normalizeNetwork } from "@/lib/network";
 
-const STORAGE_KEY = "ghostpay:network";
+const STORAGE_KEY = "tippit:network";
 
 type NetworkContextValue = {
   network: AppNetwork;

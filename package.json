@@ -1,5 +1,5 @@
 {
-  "name": "ghostpay",
+  "name": "tippit",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,10 +8,14 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "check:valkey": "node scripts/check-valkey.mjs"
+    "check:valkey": "node scripts/check-valkey.mjs",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
+    "@prisma/client": "^6.8.2",
     "@solana/pay": "^1.0.16",
     "@solana/spl-token": "^0.4.8",
     "@solana/wallet-adapter-base": "^0.9.23",
@@ -39,6 +43,7 @@
     "@types/snarkjs": "^0",
     "autoprefixer": "10.4.20",
     "postcss": "8.4.49",
+    "prisma": "^6.8.2",
     "tailwindcss": "3.4.17",
     "typescript": "5.7.3"
   }

@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TippitRail {
+  magicblock
+  umbra
+}
+
+enum TipVisibility {
+  public
+  creator_only
+  anonymous
+}
+
+enum TipStatus {
+  created
+  signed
+  confirmed
+  failed
+}
+
+enum WithdrawalStatus {
+  created
+  confirmed
+  failed
+}
+
+model CreatorProfile {
+  id            String       @id @default(cuid())
+  walletAddress String       @unique
+  slug          String       @unique
+  displayName   String
+  bio           String?
+  avatarUrl     String?
+  bannerUrl     String?
+  isVerified    Boolean      @default(false)
+  isActive      Boolean      @default(true)
+  defaultRail   TippitRail   @default(magicblock)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  tips          Tip[]
+  withdrawals   Withdrawal[]
+}
+
+model Tip {
+  id               String        @id @default(cuid())
+  creatorId        String
+  creatorSlug      String
+  fanWalletAddress String?
+  amountBaseUnits  String
+  amountUi         Decimal       @db.Decimal(20, 6)
+  tokenMint        String
+  tokenSymbol      String
+  message          String?
+  visibility       TipVisibility @default(creator_only)
+  paymentRail      TippitRail    @default(magicblock)
+  paymentStatus    TipStatus     @default(created)
+  txSignature      String?
+  clientRefId      String        @unique
+  createdAt        DateTime      @default(now())
+  confirmedAt      DateTime?
+  creator          CreatorProfile @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId, createdAt(sort: Desc)])
+  @@index([creatorSlug, createdAt(sort: Desc)])
+}
+
+model Withdrawal {
+  id              String           @id @default(cuid())
+  creatorId       String
+  amountBaseUnits String
+  amountUi        Decimal          @db.Decimal(20, 6)
+  tokenMint       String
+  tokenSymbol     String
+  paymentRail     TippitRail       @default(magicblock)
+  txSignature     String?
+  status          WithdrawalStatus @default(created)
+  createdAt       DateTime         @default(now())
+  confirmedAt     DateTime?
+  creator         CreatorProfile   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId, createdAt(sort: Desc)])
+}

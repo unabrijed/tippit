@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: ["class"],
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -33,6 +32,7 @@ const config: Config = {
         accent: {
           DEFAULT: "var(--accent)",
           foreground: "var(--accent-foreground)",
+          soft: "var(--accent-soft)",
         },
         destructive: {
           DEFAULT: "var(--destructive)",
@@ -43,22 +43,8 @@ const config: Config = {
           DEFAULT: "var(--success)",
           foreground: "var(--success-foreground)",
         },
-        ghost: {
-          ivory: "#F7F4EF",
-          cream: "#EDE9E2",
-          pine: "#2C4A3E",
-          sage: "#4A7C6B",
-          mist: "#8FA89F",
-          gold: "#C9A96E",
-          sand: "#D4C4A8",
-          ink: "#1A1917",
-          smoke: "#6B6560",
-          veil: "#A8A49F",
-          error: "#8C3A2F"
-        }
       },
       fontFamily: {
-        display: ["var(--font-display)"],
         sans: ["var(--font-sans)"],
         mono: ["var(--font-mono)"]
       },
@@ -68,10 +54,19 @@ const config: Config = {
         xl: "24px"
       },
       boxShadow: {
-        soft: "0 18px 40px rgba(44,74,62,0.08)"
+        soft: "0 8px 32px rgba(10,15,30,0.06)",
+        card: "0 4px 24px rgba(10,15,30,0.04)",
+        glow: "0 0 40px rgba(83,115,255,0.15)",
       },
       transitionTimingFunction: {
         ghost: "cubic-bezier(0.16, 1, 0.3, 1)"
+      },
+      animation: {
+        "enter": "enter 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "scale-in": "scale-in 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "slide-up": "slide-up 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "float": "float 6s ease-in-out infinite",
+        "pulse-soft": "pulse-soft 3s ease-in-out infinite",
       }
     }
   },
