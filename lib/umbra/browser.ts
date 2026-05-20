@@ -29,9 +29,14 @@ function normalizeUmbraError(error: unknown) {
 }
 
 async function getUmbraDeps() {
-  const sdk = await import("@umbra-privacy/sdk");
-  const prover = await import("@umbra-privacy/web-zk-prover");
-  return { sdk, prover };
+  const [sdkCore, sdkRegistration, sdkQuery, sdkDeposit, sdkBurn] = await Promise.all([
+    import("@umbra-privacy/sdk"),
+    import("@umbra-privacy/sdk/registration"),
+    import("@umbra-privacy/sdk/query"),
+    import("@umbra-privacy/sdk/deposit"),
+    import("@umbra-privacy/sdk/burn"),
+  ]);
+  return { sdkCore, sdkRegistration, sdkQuery, sdkDeposit, sdkBurn };
 }
 
 function getStandardWalletAccount(wallet: Wallet | null) {
@@ -50,9 +55,10 @@ function getStandardWalletAccount(wallet: Wallet | null) {
 }
 
 async function getClient(wallet: Wallet | null, network: AppNetwork) {
-  const { sdk, prover } = await getUmbraDeps();
+  const deps = await getUmbraDeps();
+  const { sdkCore } = deps;
   const { standardWallet, account } = getStandardWalletAccount(wallet);
-  const signer = sdk.createSignerFromWalletAccount(standardWallet, account);
+  const signer = sdkCore.createSignerFromWalletAccount(standardWallet, account);
   const appEnv = getAppEnv(network);
   const rpcUrl = appEnv.rpcUrl;
 
@@ -60,9 +66,9 @@ async function getClient(wallet: Wallet | null, network: AppNetwork) {
   // The WebSocket endpoint on public RPCs (mainnet/devnet) is unreliable and
   // frequently causes confirmation timeouts even when the tx lands on-chain.
   // Polling via getSignatureStatuses is slower but far more reliable.
-  const transactionForwarder = sdk.getPollingTransactionForwarder({ rpcUrl });
+  const transactionForwarder = sdkCore.getPollingTransactionForwarder({ rpcUrl });
 
-  const client = await sdk.getUmbraClient(
+  const client = await sdkCore.getUmbraClient(
     {
       signer,
       network: appEnv.umbraNetwork,
@@ -72,18 +78,18 @@ async function getClient(wallet: Wallet | null, network: AppNetwork) {
     },
     { transactionForwarder }
   );
-  return { sdk, prover, signer, client };
+  return { ...deps, signer, client };
 }
 
 async function runRegistration(
-  sdk: Awaited<ReturnType<typeof getUmbraDeps>>["sdk"],
-  prover: Awaited<ReturnType<typeof getUmbraDeps>>["prover"],
+  deps: Awaited<ReturnType<typeof getUmbraDeps>>,
   client: Awaited<ReturnType<typeof getClient>>["client"],
   onProgress?: ProgressCallback
 ) {
-  const register = sdk.getUserRegistrationFunction(
+  const { sdkCore, sdkRegistration } = deps;
+  const register = sdkRegistration.getUserRegistrationFunction(
     { client },
-    { zkProver: prover.getUserRegistrationProver() }
+    { zkProver: sdkCore.getUserRegistrationProver() }
   );
 
   return register({
@@ -110,8 +116,8 @@ export async function checkUmbraRegistration(wallet: Wallet | null, network: App
   try {
     const support = getUmbraWalletSupport(wallet);
     if (!support.supported) return false;
-    const { sdk, client } = await getClient(wallet, network);
-    const query = sdk.getUserAccountQuerierFunction({ client });
+    const { sdkQuery, client } = await getClient(wallet, network);
+    const query = sdkQuery.getUserAccountQuerierFunction({ client });
     const result = await query(client.signer.address);
     return (
       result.state === "exists" &&
@@ -127,11 +133,12 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
   const { isRegistrationError } = await import("@umbra-privacy/sdk/errors");
   try {
     onProgress?.("Preparing Umbra wallet registration…");
-    const { sdk, prover, client } = await getClient(wallet, network);
+    const clientCtx = await getClient(wallet, network);
+    const { sdkQuery, client } = clientCtx;
 
     // Check registration state first — skip register() entirely if already complete
     // to avoid unnecessary wallet prompts and SOL costs.
-    const query = sdk.getUserAccountQuerierFunction({ client });
+    const query = sdkQuery.getUserAccountQuerierFunction({ client });
     const accountState = await query(client.signer.address);
     const isFullyRegistered =
       accountState.state === "exists" &&
@@ -143,7 +150,8 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
       return [];
     }
 
-    return await runRegistration(sdk, prover, client, onProgress);
+    const deps = { sdkCore: clientCtx.sdkCore, sdkRegistration: clientCtx.sdkRegistration, sdkQuery: clientCtx.sdkQuery, sdkDeposit: clientCtx.sdkDeposit, sdkBurn: clientCtx.sdkBurn };
+    return await runRegistration(deps, client, onProgress);
   } catch (error) {
     if (isRegistrationError(error)) {
       switch (error.stage) {
@@ -167,10 +175,11 @@ export async function registerUmbraUser(wallet: Wallet | null, network: AppNetwo
 
 export async function createPrivatePayment(wallet: Wallet | null, args: { receiverAddress: string; mint: string; amount: number; network: AppNetwork }, onProgress?: ProgressCallback) {
   try {
-    const { sdk, prover, client } = await getClient(wallet, args.network);
+    const clientCtx = await getClient(wallet, args.network);
+    const { sdkCore, sdkQuery, sdkDeposit, client } = clientCtx;
 
     onProgress?.("Checking recipient Umbra registration…");
-    const queryAccount = sdk.getUserAccountQuerierFunction({ client });
+    const queryAccount = sdkQuery.getUserAccountQuerierFunction({ client });
     const receiverAccount = await queryAccount(args.receiverAddress as any);
     if (receiverAccount.state === "non_existent") {
       throw new Error("The recipient hasn't registered their private wallet with Umbra yet and cannot receive private tips.");
@@ -179,25 +188,19 @@ export async function createPrivatePayment(wallet: Wallet | null, args: { receiv
     await registerUmbraUser(wallet, args.network, onProgress);
     onProgress?.("Generating private tip proof…");
 
-    const createUtxo = sdk.getPublicBalanceToReceiverClaimableUtxoCreatorFunction(
+    const createNote = sdkDeposit.getATAIntoReceiverBurnableStealthPoolNoteCreatorFunction(
       { client },
       {
-        zkProver: prover.getCreateReceiverClaimableUtxoFromPublicBalanceProver({
-          callbacks: {
-            onStart: () => onProgress?.("Creating receiver-claimable private UTXO…"),
-            onComplete: () => onProgress?.("Submitting private tip transaction…")
-          } as any
-        })
+        zkProver: sdkCore.getATAIntoStealthPoolNoteCreatorProver() as any
       }
     );
 
-    const result = await createUtxo(
+    const result = await createNote(
       {
         destinationAddress: args.receiverAddress as any,
         mint: args.mint as any,
         amount: toAtomicAmount(args.amount) as any
-      },
-      {}
+      }
     );
 
     onProgress?.("Private tip submitted.");
@@ -215,6 +218,9 @@ function pickBestClaimCandidate(candidates: any[], receiverAddress: string, amou
 }
 
 function extractClaimSignature(result: any) {
+  // v5 burn result — ClaimRelayResponse shape
+  if (result?.claimResult?.signature) return result.claimResult.signature as string;
+  // Fallback for legacy shape
   const signatureGroups = Object.values(result?.signatures ?? {});
   const flattened = signatureGroups.flatMap((item: any) => Array.isArray(item) ? item : [item]);
   return flattened.find(Boolean) as string | undefined;
@@ -222,43 +228,46 @@ function extractClaimSignature(result: any) {
 
 export async function claimLatestPrivatePayment(wallet: Wallet | null, args: { receiverAddress: string; amount: number; network: AppNetwork }, onProgress?: ProgressCallback) {
   try {
-    const { sdk, prover, client } = await getClient(wallet, args.network);
+    const clientCtx = await getClient(wallet, args.network);
+    const { sdkCore, sdkBurn, client } = clientCtx;
     const appEnv = getAppEnv(args.network);
-    const relayer = sdk.getUmbraRelayer({ apiEndpoint: appEnv.umbraRelayerApiEndpoint });
+    const relayer = sdkCore.getUmbraRelayer({ apiEndpoint: appEnv.umbraRelayerApiEndpoint });
 
     await registerUmbraUser(wallet, args.network, onProgress);
     onProgress?.("Scanning Umbra claimable payments…");
 
-    const scan = sdk.getClaimableUtxoScannerFunction({ client });
-    const scanned = await scan(0 as any, 0 as any, 256 as any);
-    const candidates = [...(scanned.publicReceived ?? []), ...(scanned.received ?? [])];
+    if (!client.fetchBatchMerkleProof) {
+      throw new Error("Indexer not configured — supply NEXT_PUBLIC_UMBRA_INDEXER_API_ENDPOINT to enable private claims.");
+    }
+
+    const scan = sdkBurn.getBurnableStealthPoolNoteScannerFunction({ client });
+    const scanned = await scan();
+    // Combine notes deposited from public ATA and from encrypted balance
+    const candidates = [...(scanned.ataIntoReceiverBurnable ?? []), ...(scanned.etaIntoReceiverBurnable ?? [])];
     const target = pickBestClaimCandidate(candidates, args.receiverAddress, args.amount);
     if (!target) {
       throw new Error("No matching private tip was found to claim yet.");
     }
 
-    // SDK v4+: fetchBatchMerkleProof is available directly on the client (populated
-    // automatically when indexerApiEndpoint is supplied to getUmbraClient)
-    const fetchBatchMerkleProof = (client as any).fetchBatchMerkleProof;
-    if (!fetchBatchMerkleProof) {
-      throw new Error("Indexer not configured — supply NEXT_PUBLIC_UMBRA_INDEXER_API_ENDPOINT to enable private claims.");
-    }
-
-    const claim = sdk.getReceiverClaimableUtxoToEncryptedBalanceClaimerFunction(
+    const burn = sdkBurn.getReceiverBurnableStealthPoolNoteIntoETABurnerFunction(
       { client },
       {
-        fetchBatchMerkleProof,
-        zkProver: prover.getClaimReceiverClaimableUtxoIntoEncryptedBalanceProver({
+        fetchBatchMerkleProof: client.fetchBatchMerkleProof,
+        zkProver: sdkCore.getClaimReceiverClaimableUtxoIntoEncryptedBalanceProver({
           callbacks: {
             onStart: () => onProgress?.("Generating claim proof…"),
             onComplete: () => onProgress?.("Submitting private claim via relayer…")
           } as any
-        }),
-        relayer
+        }) as any,
+        relayer: {
+          submitBurn: (relayer as any).submitClaim ?? (relayer as any).submitBurn,
+          pollBurnStatus: (relayer as any).pollClaimStatus ?? (relayer as any).pollBurnStatus,
+          getRelayerAddress: relayer.getRelayerAddress.bind(relayer),
+        },
       }
     );
 
-    const result = await claim([target]);
+    const result = await burn([target]);
     onProgress?.("Private claim submitted.");
     return {
       result,

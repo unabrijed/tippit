@@ -25,7 +25,7 @@
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-solflare": "^0.6.28",
     "@solana/web3.js": "^1.98.0",
-    "@umbra-privacy/sdk": "2.0.3",
+    "@umbra-privacy/sdk": "5.0.0-rc.0",
     "@umbra-privacy/web-zk-prover": "^2.0.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.39.0",

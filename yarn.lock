@@ -1109,40 +1109,25 @@
     "@solana/kit" "^6.0.1"
     "@solana/sysvars" "^6.0.1"
 
-"@umbra-privacy/indexer-proto-gen@2.0.1":
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/@umbra-privacy/indexer-proto-gen/-/indexer-proto-gen-2.0.1.tgz#7c366c50b843c47caea99cd8f7b6782865c77d48"
-  integrity sha512-IQW7ua1I5wu346FfSLAllUfciO3iKNzybsFYBCD4wj6R5DMGNrtJq3MoSR3JchRT/UroVFB7J38z3S6r1KNK+Q==
+"@umbra-privacy/sdk@5.0.0-rc.0":
+  version "5.0.0-rc.0"
+  resolved "https://registry.yarnpkg.com/@umbra-privacy/sdk/-/sdk-5.0.0-rc.0.tgz#be2cb0be092ab0e1c9c9ca88e4de3abe19b1ebcc"
+  integrity sha512-ipV3AAFTnbwx4qc89zA8o8mBm6HO9ewz4q4l9xsPHhamoICC5II143mVbp38tCqYrb+uEuox4VYsIbfcQU+TnA==
   dependencies:
     "@bufbuild/protobuf" "^2.0.0"
-
-"@umbra-privacy/indexer-read-service-client@2.0.1":
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/@umbra-privacy/indexer-read-service-client/-/indexer-read-service-client-2.0.1.tgz#70e07bb7d32069df7cb53da71f617e3a7438affb"
-  integrity sha512-sIlN8TwUBjKUO8ZFE9teGbO3GiqjPMpB2uqlFeF2O7XGNBXkQ5g9PjqNiCBZ8xJOIq8bEJNxUceezj64EAhOjA==
-  dependencies:
-    "@bufbuild/protobuf" "^2.0.0"
-    "@umbra-privacy/indexer-proto-gen" "2.0.1"
-
-"@umbra-privacy/sdk@2.0.3":
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/@umbra-privacy/sdk/-/sdk-2.0.3.tgz#39c80f3716e1219e5afcb6193736b2e18ba91e8c"
-  integrity sha512-9LrIe7NreP2UMMBaLQr6LqPPve9oK7OIFTOyfAtlK06l90IM72VJk/5RyGsq+JC+kU2IUyG3itMUm6asFfVvog==
-  dependencies:
     "@noble/ciphers" "^2.1.1"
     "@noble/curves" "^2.0.1"
     "@noble/hashes" "^2.0.1"
     "@solana/kit" "^6.0.1"
     "@solana/wallet-standard-features" "^1.3.0"
     "@umbra-privacy/arcium-codama" "2.0.1"
-    "@umbra-privacy/indexer-read-service-client" "2.0.1"
-    "@umbra-privacy/umbra-codama" "2.0.1"
+    "@umbra-privacy/umbra-codama" "2.0.2"
     "@wallet-standard/core" "^1.1.0"
 
-"@umbra-privacy/umbra-codama@2.0.1":
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/@umbra-privacy/umbra-codama/-/umbra-codama-2.0.1.tgz#9734ee5f7fb115176bbcb85d0bf407538938aa5d"
-  integrity sha512-pbGaxvfDQ7ldqeiaYIiL4nqFG1yxj+cnmfAfgXNKnEmw3jYK+ga89S7e4ZiV01UIUtFbsfkC4JK5ZMbcNTdTjQ==
+"@umbra-privacy/umbra-codama@2.0.2":
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/@umbra-privacy/umbra-codama/-/umbra-codama-2.0.2.tgz#f8271c00e76ff149d67ed0ad9f99895e736440cb"
+  integrity sha512-ogGoHbxTQyvEdaPOyYTAx48XNQgvXcvkt5CdTKwPbRrcb3J6zhYEvrdyFBlOuI8GKjcpITi+5AiPnd41BikRHQ==
   dependencies:
     "@solana-program/system" "^0.11.0"
     "@solana-program/token-2022" "^0.9.0"
